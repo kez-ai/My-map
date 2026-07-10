@@ -92,6 +92,7 @@ button{ border:none; cursor:pointer; -webkit-tap-highlight-color:transparent; }
   pointer-events:auto; border:1px solid var(--line);
 }
 .icon-btn svg{ width:18px; height:18px; }
+.icon-btn.active{ background:var(--amber); color:#1A1204; border-color:var(--amber); }
 
 /* ---------- Banners ---------- */
 .banner{
@@ -204,7 +205,12 @@ button{ border:none; cursor:pointer; -webkit-tap-highlight-color:transparent; }
 
   <div id="topbar">
     <div class="brand">Waypoint</div>
-    <div class="live-badge"><span class="live-dot" id="liveDot"></span><span id="liveText">Live</span></div>
+    <div style="display:flex; align-items:center; gap:8px; pointer-events:auto;">
+      <button class="icon-btn" id="satToggle" onclick="toggleBasemap()" aria-label="Toggle satellite view">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      </button>
+      <div class="live-badge"><span class="live-dot" id="liveDot"></span><span id="liveText">Live</span></div>
+    </div>
   </div>
 
   <div class="banner" id="hintPoint" hidden>
@@ -337,12 +343,18 @@ document.getElementById("passInput").addEventListener("keydown", function (e) {
 });
 
 /* ============ MAP ============ */
+let streetLayer, satLayer, satOn = false;
 function initMap() {
   map = L.map("map", { zoomControl: false, attributionControl: true }).setView(FALLBACK_CENTER, 14);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  streetLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom: 19
-  }).addTo(map);
+  });
+  satLayer = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+    attribution: "Tiles &copy; Esri",
+    maxZoom: 19
+  });
+  streetLayer.addTo(map);
   itemsLayer = L.layerGroup().addTo(map);
   map.on("click", onMapClick);
 
@@ -352,6 +364,18 @@ function initMap() {
   setTimeout(function () {
     showToast("Tap Add Spot or Shortcut, then tap the map");
   }, 1000);
+}
+
+function toggleBasemap() {
+  satOn = !satOn;
+  if (satOn) {
+    map.removeLayer(streetLayer);
+    satLayer.addTo(map);
+  } else {
+    map.removeLayer(satLayer);
+    streetLayer.addTo(map);
+  }
+  document.getElementById("satToggle").classList.toggle("active", satOn);
 }
 
 function locateMe(silent) {
@@ -436,191 +460,4 @@ function escapeHTML(s) {
 }
 
 /* ============ ADD FLOW ============ */
-function toggleMode(m) { setMode(mode === m ? null : m); }
-
-function setMode(m) {
-  mode = m;
-  drawingPoints = [];
-  clearTempLine();
-  updateModeUI();
-}
-
-function updateModeUI() {
-  document.getElementById("fabSpot").classList.toggle("active", mode === "point");
-  document.getElementById("fabShortcut").classList.toggle("active", mode === "path");
-  document.getElementById("hintPoint").hidden = mode !== "point";
-  document.getElementById("drawBanner").hidden = mode !== "path";
-  if (mode === "path") {
-    const n = drawingPoints.length;
-    document.getElementById("drawCount").textContent = n + (n === 1 ? " point" : " points");
-  }
-}
-
-function onMapClick(e) {
-  if (mode === "point") {
-    openItemModal({ type: "point", coords: [e.latlng.lat, e.latlng.lng] });
-    setMode(null);
-  } else if (mode === "path") {
-    drawingPoints.push([e.latlng.lat, e.latlng.lng]);
-    updateTempLine();
-    updateModeUI();
-  }
-}
-
-function updateTempLine() {
-  clearTempLine();
-  if (drawingPoints.length > 1) {
-    tempDrawLayer = L.polyline(drawingPoints, { color: CATEGORIES.shortcut.color, weight: 4, dashArray: "2 8", opacity: 0.9 }).addTo(map);
-  }
-  if (drawingPoints.length > 0) {
-    tempVertexLayer = L.layerGroup(drawingPoints.map(function (pt) {
-      return L.circleMarker(pt, { radius: 5, color: "#fff", weight: 2, fillColor: CATEGORIES.shortcut.color, fillOpacity: 1 });
-    })).addTo(map);
-  }
-}
-
-function clearTempLine() {
-  if (tempDrawLayer) { map.removeLayer(tempDrawLayer); tempDrawLayer = null; }
-  if (tempVertexLayer) { map.removeLayer(tempVertexLayer); tempVertexLayer = null; }
-}
-
-function undoPoint() {
-  drawingPoints.pop();
-  updateTempLine();
-  updateModeUI();
-}
-
-function finishPath() {
-  if (drawingPoints.length < 2) { showToast("Add at least 2 points first"); return; }
-  openItemModal({ type: "path", coords: drawingPoints.slice() });
-  setMode(null);
-}
-
-/* ============ MODAL ============ */
-function openItemModal(partial) {
-  pendingItem = partial;
-  document.getElementById("modalTitle").textContent = partial.type === "path" ? "Name this shortcut" : "Name this spot";
-  document.getElementById("labelInput").value = "";
-  document.getElementById("notesInput").value = "";
-
-  const chipRow = document.getElementById("categoryChips");
-  chipRow.innerHTML = "";
-  const cats = partial.type === "path" ? ["shortcut"] : ["spot", "hazard", "other"];
-  chipRow.hidden = partial.type === "path";
-  selectedCategory = cats[0];
-  cats.forEach(function (key) {
-    const cat = CATEGORIES[key];
-    const chip = document.createElement("button");
-    chip.type = "button";
-    chip.className = "chip" + (key === selectedCategory ? " active" : "");
-    chip.style.setProperty("--chip-color", cat.color);
-    chip.textContent = cat.label;
-    chip.onclick = function () {
-      selectedCategory = key;
-      Array.prototype.forEach.call(chipRow.children, function (c) { c.classList.remove("active"); });
-      chip.classList.add("active");
-    };
-    chipRow.appendChild(chip);
-  });
-
-  document.getElementById("modalOverlay").hidden = false;
-  setTimeout(function () { document.getElementById("labelInput").focus(); }, 50);
-}
-
-function closeModal() {
-  document.getElementById("modalOverlay").hidden = true;
-  pendingItem = null;
-}
-
-async function saveModal() {
-  const label = document.getElementById("labelInput").value.trim();
-  if (!label) { showToast("Add a name first"); return; }
-  const notes = document.getElementById("notesInput").value.trim();
-  const item = {
-    id: "w" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
-    type: pendingItem.type,
-    category: pendingItem.type === "path" ? "shortcut" : selectedCategory,
-    label: label,
-    notes: notes,
-    coords: pendingItem.coords,
-    addedAt: Date.now()
-  };
-  closeModal();
-  showToast("Saved");
-  await saveItem(item);
-}
-
-/* ============ DELETE ============ */
-function askDelete(id) {
-  pendingDeleteId = id;
-  document.getElementById("confirmOverlay").hidden = false;
-}
-function cancelDelete() {
-  pendingDeleteId = null;
-  document.getElementById("confirmOverlay").hidden = true;
-}
-async function confirmDelete() {
-  if (!pendingDeleteId) return;
-  const id = pendingDeleteId;
-  document.getElementById("confirmOverlay").hidden = true;
-  pendingDeleteId = null;
-  map.closePopup();
-  await removeItem(id);
-}
-
-/* ============ DRAWER / LIST ============ */
-function openDrawer() {
-  renderList();
-  document.getElementById("drawerOverlay").hidden = false;
-}
-function closeDrawer() { document.getElementById("drawerOverlay").hidden = true; }
-
-function renderList() {
-  const list = document.getElementById("drawerList");
-  document.getElementById("itemCount").textContent = items.length ? "(" + items.length + ")" : "";
-  if (!items.length) {
-    list.innerHTML = '<p class="empty">Nothing on the map yet — add a spot or shortcut to get started.</p>';
-    return;
-  }
-  const sorted = items.slice().sort(function (a, b) { return b.addedAt - a.addedAt; });
-  list.innerHTML = sorted.map(function (item) {
-    const cat = CATEGORIES[item.category] || CATEGORIES.other;
-    return '<div class="list-row" onclick="flyTo(\'' + item.id + '\')">' +
-      '<span class="dot" style="background:' + cat.color + '"></span>' +
-      '<div class="list-row-text">' +
-      '<div class="list-row-label">' + escapeHTML(item.label) + "</div>" +
-      '<div class="list-row-cat">' + cat.label + "</div>" +
-      "</div>" +
-      '<button class="icon-btn small" onclick="event.stopPropagation(); askDelete(\'' + item.id + '\')" aria-label="Delete">' +
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 20 7"/><path d="M6 7v13a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg>' +
-      "</button></div>";
-  }).join("");
-}
-
-function flyTo(id) {
-  const item = items.find(function (i) { return i.id === id; });
-  if (!item) return;
-  closeDrawer();
-  if (item.type === "point") {
-    map.flyTo(item.coords, 17);
-  } else {
-    map.flyToBounds(L.latLngBounds(item.coords), { padding: [60, 60] });
-  }
-  const layer = layerById[id];
-  if (layer) setTimeout(function () { layer.openPopup(); }, 450);
-}
-
-/* ============ TOAST ============ */
-function showToast(msg) {
-  const t = document.getElementById("toast");
-  t.textContent = msg;
-  t.classList.add("show");
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2400);
-}
-
-/* ============ MISC ============ */
-window.addEventListener("resize", function () { if (map) map.invalidateSize(); });
-</script>
-</body>
-</html>
+function toggleMode(m) { setMode(mode === m ? 
