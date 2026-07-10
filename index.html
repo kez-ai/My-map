@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Waypoint</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Waypoint">
+<meta name="theme-color" content="#10151A">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{
+  --bg:#10151A;
+  --surface:#1A2320;
+  --surface2:#232D28;
+  --ink:#EDE8DD;
+  --ink-muted:#8FA098;
+  --amber:#E8A33D;
+  --moss:#6FA37E;
+  --rust:#C1543C;
+  --line: rgba(237,232,221,0.10);
+  --font-display:'Space Grotesk', system-ui, sans-serif;
+  --font-body:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+*{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body{
+  margin:0; padding:0; height:100vh; height:100dvh; width:100%;
+  background:var(--bg); color:var(--ink); font-family:var(--font-body);
+  overscroll-behavior:none; overflow:hidden; position:fixed; inset:0;
+}
+button, input, textarea{ font-family:var(--font-body); }
+h1,h2,.brand{ font-family:var(--font-display); margin:0; }
+button{ border:none; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+
+/* ---------- Gate ---------- */
+#gate{
+  position:fixed; inset:0; z-index:100; background:var(--bg);
+  display:flex; align-items:center; justify-content:center; padding:24px;
+}
+.gate-card{ width:100%; max-width:340px; text-align:center; }
+.gate-card h1{ font-size:32px; font-weight:700; letter-spacing:-0.02em; color:var(--ink); }
+.gate-sub{ color:var(--ink-muted); margin:8px 0 28px; font-size:14px; }
+#passInput{
+  width:100%; padding:14px 16px; border-radius:12px; border:1px solid var(--line);
+  background:var(--surface); color:var(--ink); font-size:16px; text-align:center;
+  letter-spacing:0.04em; outline:none; margin-bottom:12px;
+}
+#passInput:focus{ border-color:var(--amber); }
+.btn-primary{
+  width:100%; padding:14px 16px; border-radius:12px; background:var(--amber);
+  color:#1A1204; font-weight:600; font-size:15px;
+}
+.btn-primary:active{ opacity:0.85; }
+.gate-error{ color:var(--rust); font-size:13px; margin-top:12px; }
+
+/* ---------- App shell ---------- */
+#app{ position:fixed; inset:0; }
+#map{ position:absolute; inset:0; background:var(--bg); z-index:1; }
+.leaflet-popup-content-wrapper{ background:var(--surface2); color:var(--ink); border-radius:14px; }
+.leaflet-popup-tip{ background:var(--surface2); }
+.leaflet-popup-content{ margin:14px 16px; min-width:160px; }
+.leaflet-container a.leaflet-popup-close-button{ color:var(--ink-muted); padding:6px 8px 0 0; }
+.popup-cat{ font-family:var(--font-display); font-size:11px; font-weight:600; letter-spacing:0.06em; margin-bottom:2px; }
+.popup-label{ font-size:15px; font-weight:600; margin-bottom:4px; }
+.popup-notes{ font-size:13px; color:var(--ink-muted); margin-bottom:10px; line-height:1.4; }
+.popup-delete{ background:none; color:var(--rust); font-size:13px; padding:4px 0; font-weight:600; }
+
+/* ---------- Top bar ---------- */
+#topbar{
+  position:fixed; top:0; left:0; right:0; z-index:60;
+  padding:calc(env(safe-area-inset-top) + 12px) 16px 12px;
+  display:flex; align-items:center; justify-content:space-between;
+  background:linear-gradient(to bottom, rgba(16,21,26,0.92), rgba(16,21,26,0));
+  pointer-events:none;
+}
+#topbar .brand{ font-size:18px; font-weight:700; color:var(--ink); pointer-events:auto; }
+.live-badge{
+  display:flex; align-items:center; gap:6px; background:var(--surface); border:1px solid var(--line);
+  border-radius:20px; padding:8px 12px; font-size:11px; font-weight:600; color:var(--ink-muted);
+  pointer-events:auto;
+}
+.live-dot{ width:7px; height:7px; border-radius:50%; background:var(--moss); }
+.live-dot.offline{ background:var(--rust); }
+.icon-btn{
+  width:40px; height:40px; border-radius:20px; background:var(--surface);
+  color:var(--ink); display:flex; align-items:center; justify-content:center;
+  pointer-events:auto; border:1px solid var(--line);
+}
+.icon-btn svg{ width:18px; height:18px; }
+.icon-btn.active{ background:var(--amber); color:#1A1204; border-color:var(--amber); }
+
+/* ---------- Banners ---------- */
+.banner{
+  position:fixed; left:16px; right:16px; z-index:55;
+  top:calc(env(safe-area-inset-top) + 64px);
+  background:var(--surface2); border:1px solid var(--line); border-radius:14px;
+  padding:12px 14px; font-size:13px; color:var(--ink-muted);
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+}
+.banner strong{ color:var(--ink); }
+.draw-banner-actions{ display:flex; gap:8px; }
+.banner button{ background:var(--surface); color:var(--ink); font-size:12px; font-weight:600; padding:8px 12px; border-radius:9px; }
+.banner button.primary{ background:var(--amber); color:#1A1204; }
+
+/* ---------- FAB bar ---------- */
+#fabBar{
+  position:fixed; left:0; right:0; bottom:0; z-index:60;
+  padding:10px 16px calc(env(safe-area-inset-bottom) + 14px);
+  display:flex; justify-content:center;
+  background:linear-gradient(to top, rgba(16,21,26,0.95), rgba(16,21,26,0));
+}
+.fab-row{
+  display:flex; gap:10px; background:var(--surface); border:1px solid var(--line);
+  border-radius:20px; padding:8px; align-items:stretch;
+}
+.fab{
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:4px; width:64px; padding:8px 4px; border-radius:14px; background:transparent;
+  color:var(--ink-muted); font-size:10px; font-weight:600;
+}
+.fab svg{ width:20px; height:20px; }
+.fab.active{ background:var(--surface2); color:var(--amber); }
+
+/* ---------- Modal / confirm ---------- */
+.overlay{
+  position:fixed; inset:0; z-index:90; background:rgba(8,10,9,0.6);
+  display:flex; align-items:flex-end; justify-content:center;
+}
+.sheet{
+  width:100%; max-width:480px; background:var(--surface); border-radius:20px 20px 0 0;
+  padding:20px 20px calc(env(safe-area-inset-bottom) + 20px);
+}
+.sheet h2{ font-size:18px; margin-bottom:14px; }
+.chip-row{ display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+.chip{
+  padding:8px 14px; border-radius:10px; background:var(--surface2); color:var(--ink-muted);
+  font-size:13px; font-weight:600; border:1px solid var(--line);
+}
+.chip.active{ background:var(--chip-color); color:#10151A; border-color:var(--chip-color); }
+#labelInput, #notesInput{
+  width:100%; padding:12px 14px; border-radius:12px; border:1px solid var(--line);
+  background:var(--surface2); color:var(--ink); font-size:15px; outline:none; margin-bottom:10px;
+}
+#labelInput:focus, #notesInput:focus{ border-color:var(--amber); }
+#notesInput{ resize:none; height:64px; }
+.modal-actions{ display:flex; gap:10px; margin-top:6px; }
+.modal-actions button{ flex:1; padding:13px; border-radius:12px; font-size:14px; font-weight:600; }
+.btn-ghost{ background:var(--surface2); color:var(--ink); }
+.confirm-sheet p{ color:var(--ink-muted); font-size:14px; margin:0 0 16px; }
+.confirm-sheet .modal-actions .btn-danger{ background:var(--rust); color:#fff; }
+
+/* ---------- Drawer ---------- */
+#drawerOverlay{ align-items:flex-end; }
+.drawer{
+  width:100%; max-width:480px; max-height:70vh; background:var(--surface);
+  border-radius:20px 20px 0 0; padding:10px 16px calc(env(safe-area-inset-bottom) + 16px);
+  display:flex; flex-direction:column;
+}
+.drawer-handle{ width:36px; height:4px; background:var(--line); border-radius:2px; margin:2px auto 14px; }
+.drawer h2{ font-size:16px; margin-bottom:10px; display:flex; gap:6px; align-items:baseline; }
+.drawer h2 span{ font-family:var(--font-body); color:var(--ink-muted); font-size:13px; font-weight:400; }
+.drawer-list{ overflow-y:auto; }
+.list-row{
+  display:flex; align-items:center; gap:12px; padding:11px 4px; border-bottom:1px solid var(--line);
+}
+.dot{ width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.list-row-text{ flex:1; min-width:0; }
+.list-row-label{ font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.list-row-cat{ font-size:12px; color:var(--ink-muted); }
+.icon-btn.small{ width:32px; height:32px; border-radius:16px; background:transparent; border:none; color:var(--ink-muted); }
+.icon-btn.small svg{ width:16px; height:16px; }
+.empty{ color:var(--ink-muted); font-size:14px; text-align:center; padding:24px 8px; }
+
+/* ---------- Toast ---------- */
+#toast{
+  position:fixed; left:50%; bottom:118px; transform:translate(-50%,10px); z-index:70;
+  background:var(--surface2); color:var(--ink); padding:11px 18px; border-radius:12px;
+  font-size:13px; opacity:0; transition:opacity 0.2s, transform 0.2s; pointer-events:none;
+  border:1px solid var(--line); white-space:nowrap;
+}
+#toast.show{ opacity:1; transform:translate(-50%,0); }
+
+[hidden]{ display:none !important; }
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <div class="gate-card">
+    <h1>Waypoint</h1>
+    <p class="gate-sub">Private map — for the crew only</p>
+    <input id="passInput" type="password" placeholder="Passcode" autocomplete="off" autocapitalize="off">
+    <button class="btn-primary" onclick="tryUnlock()">Unlock</button>
+    <p class="gate-error" id="gateError" hidden>Wrong passcode — try again</p>
+  </div>
+</div>
+
+<div id="app" hidden>
+  <div id="map"></div>
+
+  <div id="topbar">
+    <div class="brand">Waypoint</div>
+    <div style="display:flex; align-items:center; gap:8px; pointer-events:auto;">
+      <button class="icon-btn" id="satToggle" onclick="toggleBasemap()" aria-label="Toggle satellite view">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      </button>
+      <div class="live-badge"><span class="live-dot" id="liveDot"></span><span id="liveText">Live</span></div>
+    </div>
+  </div>
+
+  <div class="banner" id="hintPoint" hidden>
+    <span><strong>Placing a spot</strong> — tap anywhere on the map</span>
+    <button onclick="setMode(null)">Cancel</button>
+  </div>
+
+  <div class="banner" id="drawBanner" hidden>
+    <span id="drawCount">0 points</span>
+    <div class="draw-banner-actions">
+      <button onclick="undoPoint()">Undo</button>
+      <button class="primary" onclick="finishPath()">Finish</button>
+      <button onclick="setMode(null)">Cancel</button>
+    </div>
+  </div>
+
+  <div id="fabBar">
+    <div class="fab-row">
+      <button class="fab" id="fabLocate" onclick="locateMe(false)" aria-label="Locate me">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>
+        <span>Locate</span>
+      </button>
+      <button class="fab" id="fabSpot" onclick="toggleMode('point')" aria-label="Add spot">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        <span>Add Spot</span>
+      </button>
+      <button class="fab" id="fabShortcut" onclick="toggleMode('path')" aria-label="Add shortcut">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8 17c4-1 6-5 8-9" stroke-dasharray="2 4"/></svg>
+        <span>Shortcut</span>
+      </button>
+      <button class="fab" id="fabList" onclick="openDrawer()" aria-label="List">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+        <span>List</span>
+      </button>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <div class="overlay" id="modalOverlay" hidden>
+    <div class="sheet">
+      <h2 id="modalTitle">Add spot</h2>
+      <div class="chip-row" id="categoryChips"></div>
+      <input id="labelInput" type="text" placeholder="What do you call it?" maxlength="60">
+      <textarea id="notesInput" placeholder="Notes (optional)" maxlength="200"></textarea>
+      <div class="modal-actions">
+        <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+        <button class="btn-primary" onclick="saveModal()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="confirmOverlay" hidden>
+    <div class="sheet confirm-sheet">
+      <h2>Delete this?</h2>
+      <p>This removes it for everyone with the map.</p>
+      <div class="modal-actions">
+        <button class="btn-ghost" onclick="cancelDelete()">Cancel</button>
+        <button class="btn-danger" onclick="confirmDelete()">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="drawerOverlay" hidden onclick="if(event.target===this) closeDrawer()">
+    <div class="drawer">
+      <div class="drawer-handle"></div>
+      <h2>On the map <span id="itemCount"></span></h2>
+      <div class="chip-row" id="filterChips" style="margin-bottom:4px;"></div>
+      <div class="drawer-list" id="drawerList"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/12.15.0/firebase-app-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/12.15.0/firebase-database-compat.min.js"></script>
+<script>
+/* ============ CONFIG ============ */
+// Change this before sharing the link with friends!
+const PASSCODE = "67";
+const FALLBACK_CENTER = [52.2698, -8.2680]; // Mitchelstown, Co. Cork — used if geolocation is denied
+
+// Paste your own Firebase project's config here (Firebase console → Project settings → your web app)
+const firebaseConfig = {
+  apiKey: "AIzaSyCjsyEADMSSxkEEaUD_t9XDBxvs7CsOjb8",
+  authDomain: "themap67-9f694.firebaseapp.com",
+  databaseURL: "https://themap67-9f694-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "themap67-9f694"
+};
+firebase.initializeApp(firebaseConfig);
+const itemsRef = firebase.database().ref("items");
+
+const CATEGORIES = {
+  shortcut:    { label: "Shortcut",     color: "#E8A33D" },
+  escaperoute: { label: "Escape Route", color: "#9B6FE0" },
+  border:      { label: "Border",       color: "#5B84C4" },
+  spot:        { label: "Spot",         color: "#6FA37E" },
+  hazard:      { label: "Hazard",       color: "#C1543C" },
+  other:       { label: "Other",        color: "#8FA098" }
+};
+const PATH_CATEGORIES = ["shortcut", "escaperoute", "border"];
+const POINT_CATEGORIES = ["spot", "hazard", "other"];
+let activeFilters = new Set(Object.keys(CATEGORIES));
+
+/* ============ STATE ============ */
+let map, itemsLayer;
+let mapInitialized = false;
+let items = [];
+let mode = null;               // null | 'point' | 'path'
+let drawingPoints = [];
+let tempDrawLayer = null, tempVertexLayer = null;
+let pendingItem = null;
+let selectedCategory = "spot";
+let pendingDeleteId = null;
+let toastTimer = null;
+let layerById = {};
+
+/* ============ GATE ============ */
+function tryUnlock() {
+  const val = document.getElementById("passInput").value.trim().toLowerCase();
+  if (val && val === PASSCODE.toLowerCase()) {
+    document.getElementById("gate").style.display = "none";
+    document.getElementById("app").hidden = false;
+    requestAnimationFrame(() => {
+      if (!mapInitialized) { initMap(); mapInitialized = true; }
+      setTimeout(() => { if (map) map.invalidateSize(); }, 300);
+    });
+  } else {
+    document.getElementById("gateError").hidden = false;
+    document.getElementById("passInput").value = "";
+    document.getElementById("passInput").focus();
+  }
+}
+document.getElementById("passInput").addEventListener("keydown", function (e) {
+  if (e.key === "Enter") tryUnlock();
+});
+
+/* ============ MAP ============ */
+let streetLayer, satLayer, satOn = false;
+function initMap() {
+  map = L.map("map", { zoomControl: false, attributionControl: true }).setView(FALLBACK_CENTER, 14);
+  streetLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19
+  });
+  satLayer = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+    attribution: "Tiles &copy; Esri",
+    maxZoom: 19
+  });
+  streetLayer.addTo(map);
+  itemsLayer = L.layerGroup().addTo(map);
+  map.on("click", onMapClick);
+
+  locateMe(true);
+  startSync();
+
+  setTimeout(function () {
+    showToast("Tap Add Spot or Shortcut, then tap the map");
+  }, 1000);
+}
+
+function toggleBasemap() {
+  satOn = !satOn;
+  if (satOn) {
+    map.removeLayer(streetLayer);
+    satLayer.addTo(map);
+  } else {
+    map.removeLayer(satLayer);
+    streetLayer.addTo(map);
+  }
+  document.getElementById("satToggle").classList.toggle("active", satOn);
+}
+
+function locateMe(silent) {
+  if (!navigator.geolocation) { if (!silent) showToast("Location not available on this device"); return; }
+  navigator.geolocation.getCurrentPosition(
+    function (pos) { map.setView([pos.coords.latitude, pos.coords.longitude], 15); },
+    function () { if (!silent) showToast("Couldn't get your location"); },
+    { timeout: 8000 }
+  );
+}
+
+/* ============ SYNC (Firebase Realtime Database) ============ */
+function setLiveStatus(online) {
+  document.getElementById("liveDot").classList.toggle("offline", !online);
+  document.getElementById("liveText").textContent = online ? "Live" : "Offline";
+}
+
+function startSync() {
+  itemsRef.on("value", function (snapshot) {
+    const val = snapshot.val();
+    items = val ? Object.keys(val).map(function (k) { return val[k]; }) : [];
+    renderItems();
+    renderList();
+    setLiveStatus(true);
+  }, function () {
+    setLiveStatus(false);
+    showToast("Sync error — check your Firebase config");
+  });
+  firebase.database().ref(".info/connected").on("value", function (snap) {
+    setLiveStatus(snap.val() === true);
+  });
+}
+
+async function saveItem(item) {
+  try {
+    await itemsRef.child(item.id).set(item);
+  } catch (e) {
+    showToast("Couldn't save — check your connection");
+  }
+}
+
+async function removeItem(id) {
+  try {
+    await itemsRef.child(id).remove();
+  } catch (e) {
+    showToast("Couldn't delete — check your connection");
+  }
+}
+
+/* ============ RENDER MAP ITEMS ============ */
+function renderItems() {
+  itemsLayer.clearLayers();
+  layerById = {};
+  items.forEach(function (item) {
+    if (!activeFilters.has(item.category)) return;
+    const cat = CATEGORIES[item.category] || CATEGORIES.other;
+    let layer;
+    if (item.type === "point") {
+      layer = L.circleMarker(item.coords, { radius: 9, color: "#10151A", weight: 2, fillColor: cat.color, fillOpacity: 0.95 });
+    } else {
+      layer = L.polyline(item.coords, { color: cat.color, weight: 4, dashArray: "6 6", opacity: 0.9, lineCap: "round" });
+    }
+    layer.bindPopup(popupHTML(item));
+    layer.addTo(itemsLayer);
+    layerById[item.id] = layer;
+  });
+}
+
+function popupHTML(item) {
+  const cat = CATEGORIES[item.category] || CATEGORIES.other;
+  return '<div class="popup">' +
+    '<div class="popup-cat" style="color:' + cat.color + '">' + cat.label.toUpperCase() + "</div>" +
+    '<div class="popup-label">' + escapeHTML(item.label) + "</div>" +
+    (item.notes ? '<div class="popup-notes">' + escapeHTML(item.notes) + "</div>" : "") +
+    '<button class="popup-delete" onclick="askDelete(\'' + item.id + '\')">Delete</button>' +
+    "</div>";
+}
+
+function escapeHTML(s) {
+  const d = document.createElement("div");
+  d.textContent = s == null ? "" : s;
+  return d.innerHTML;
+}
+
+/* ============ ADD FLOW ============ */
+function toggleMode(m) { setMode(mode === m ? null : m); }
+
+function setMode(m) {
+  mode = m;
+  drawingPoints = [];
+  clearTempLine();
+  updateModeUI();
+}
+
+function updateModeUI() {
+  document.getElementById("fabSpot").classList.toggle("active", mode === "point");
+  document.getElementById("fabShortcut").classList.toggle("active", mode === "path");
+  document.getElementById("hintPoint").hidden = mode !== "point";
+  document.getElementById("drawBanner").hidden = mode !== "path";
+  if (mode === "path") {
+    const n = drawingPoints.length;
+    document.getElementById("drawCount").textContent = n + (n === 1 ? " point" : " points");
+  }
+}
+
+function onMapClick(e) {
+  if (mode === "point") {
+    openItemModal({ type: "point", coords: [e.latlng.lat, e.latlng.lng] });
+    setMode(null);
+  } else if (mode === "path") {
+    drawingPoints.push([e.latlng.lat, e.latlng.lng]);
+    updateTempLine();
+    updateModeUI();
+  }
+}
+
+function updateTempLine() {
+  clearTempLine();
+  const DRAW_COLOR = "#E8A33D";
+  if (drawingPoints.length > 1) {
+    tempDrawLayer = L.polyline(drawingPoints, { color: DRAW_COLOR, weight: 4, dashArray: "2 8", opacity: 0.9 }).addTo(map);
+  }
+  if (drawingPoints.length > 0) {
+    tempVertexLayer = L.layerGroup(drawingPoints.map(function (pt) {
+      return L.circleMarker(pt, { radius: 5, color: "#fff", weight: 2, fillColor: DRAW_COLOR, fillOpacity: 1 });
+    })).addTo(map);
+  }
+}
+
+function clearTempLine() {
+  if (tempDrawLayer) { map.removeLayer(tempDrawLayer); tempDrawLayer = null; }
+  if (tempVertexLayer) { map.removeLayer(tempVertexLayer); tempVertexLayer = null; }
+}
+
+function undoPoint() {
+  drawingPoints.pop();
+  updateTempLine();
+  updateModeUI();
+}
+
+function finishPath() {
+  if (drawingPoints.length < 2) { showToast("Add at least 2 points first"); return; }
+  openItemModal({ type: "path", coords: drawingPoints.slice() });
+  setMode(null);
+}
+
+/* ============ MODAL ============ */
+function openItemModal(partial) {
+  pendingItem = partial;
+  document.getElementById("modalTitle").textContent = partial.type === "path" ? "Name this route" : "Name this spot";
+  document.getElementById("labelInput").value = "";
+  document.getElementById("notesInput").value = "";
+
+  const chipRow = document.getElementById("categoryChips");
+  chipRow.innerHTML = "";
+  const cats = partial.type === "path" ? PATH_CATEGORIES : POINT_CATEGORIES;
+  chipRow.hidden = false;
+  selectedCategory = cats[0];
+  cats.forEach(function (key) {
+    const cat = CATEGORIES[key];
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "chip" + (key === selectedCategory ? " active" : "");
+    chip.style.setProperty("--chip-color", cat.color);
+    chip.textContent = cat.label;
+    chip.onclick = function () {
+      selectedCategory = key;
+      Array.prototype.forEach.call(chipRow.children, function (c) { c.classList.remove("active"); });
+      chip.classList.add("active");
+    };
+    chipRow.appendChild(chip);
+  });
+
+  document.getElementById("modalOverlay").hidden = false;
+  setTimeout(function () { document.getElementById("labelInput").focus(); }, 50);
+}
+
+function closeModal() {
+  document.getElementById("modalOverlay").hidden = true;
+  pendingItem = null;
+}
+
+async function saveModal() {
+  const label = document.getElementById("labelInput").value.trim();
+  if (!label) { showToast("Add a name first"); return; }
+  const notes = document.getElementById("notesInput").value.trim();
+  const item = {
+    id: "w" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+    type: pendingItem.type,
+    category: selectedCategory,
+    label: label,
+    notes: notes,
+    coords: pendingItem.coords,
+    addedAt: Date.now()
+  };
+  closeModal();
+  showToast("Saved");
+  await saveItem(item);
+}
+
+/* ============ DELETE ============ */
+function askDelete(id) {
+  pendingDeleteId = id;
+  document.getElementById("confirmOverlay").hidden = false;
+}
+function cancelDelete() {
+  pendingDeleteId = null;
+  document.getElementById("confirmOverlay").hidden = true;
+}
+async function confirmDelete() {
+  if (!pendingDeleteId) return;
+  const id = pendingDeleteId;
+  document.getElementById("confirmOverlay").hidden = true;
+  pendingDeleteId = null;
+  map.closePopup();
+  await removeItem(id);
+}
+
+/* ============ DRAWER / LIST ============ */
+function openDrawer() {
+  renderList();
+  document.getElementById("drawerOverlay").hidden = false;
+}
+function closeDrawer() { document.getElementById("drawerOverlay").hidden = true; }
+
+function renderFilterChips() {
+  const row = document.getElementById("filterChips");
+  row.innerHTML = "";
+  Object.keys(CATEGORIES).forEach(function (key) {
+    const cat = CATEGORIES[key];
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "chip" + (activeFilters.has(key) ? " active" : "");
+    chip.style.setProperty("--chip-color", cat.color);
+    chip.style.opacity = activeFilters.has(key) ? "1" : "0.5";
+    chip.textContent = cat.label;
+    chip.onclick = function () {
+      if (activeFilters.has(key)) activeFilters.delete(key); else activeFilters.add(key);
+      renderFilterChips();
+      renderItems();
+      renderList();
+    };
+    row.appendChild(chip);
+  });
+}
+
+function renderList() {
+  renderFilterChips();
+  const list = document.getElementById("drawerList");
+  const visible = items.filter(function (i) { return activeFilters.has(i.category); });
+  document.getElementById("itemCount").textContent = visible.length ? "(" + visible.length + ")" : "";
+  if (!visible.length) {
+    list.innerHTML = '<p class="empty">' + (items.length ? "Nothing matches the current filters." : "Nothing on the map yet — add a spot or shortcut to get started.") + '</p>';
+    return;
+  }
+  const sorted = visible.slice().sort(function (a, b) { return b.addedAt - a.addedAt; });
+  list.innerHTML = sorted.map(function (item) {
+    const cat = CATEGORIES[item.category] || CATEGORIES.other;
+    return '<div class="list-row" onclick="flyTo(\'' + item.id + '\')">' +
+      '<span class="dot" style="background:' + cat.color + '"></span>' +
+      '<div class="list-row-text">' +
+      '<div class="list-row-label">' + escapeHTML(item.label) + "</div>" +
+      '<div class="list-row-cat">' + cat.label + "</div>" +
+      "</div>" +
+      '<button class="icon-btn small" onclick="event.stopPropagation(); askDelete(\'' + item.id + '\')" aria-label="Delete">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 20 7"/><path d="M6 7v13a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg>' +
+      "</button></div>";
+  }).join("");
+}
+
+function flyTo(id) {
+  const item = items.find(function (i) { return i.id === id; });
+  if (!item) return;
+  closeDrawer();
+  if (item.type === "point") {
+    map.flyTo(item.coords, 17);
+  } else {
+    map.flyToBounds(L.latLngBounds(item.coords), { padding: [60, 60] });
+  }
+  const layer = layerById[id];
+  if (layer) setTimeout(function () { layer.openPopup(); }, 450);
+}
+
+/* ============ TOAST ============ */
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2400);
+}
+
+/* ============ MISC ============ */
+window.addEventListener("resize", function () { if (map) map.invalidateSize(); });
+</script>
+</body>
+</html>
