@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Waypoint | Modern Navigation</title>
+  
+  <!-- Meta Tags for PWA -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Waypoint">
+  <meta name="theme-color" content="#09090b">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- External Libraries -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    :root {
+      /* Colors - Modern Zinc/Slate Palette */
+      --bg: #09090b;
+      --surface: #18181b;
+      --surface-raised: #27272a;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-bright: rgba(255, 255, 255, 0.15);
+      
+      --primary: #3b82f6;
+      --primary-glow: rgba(59, 130, 246, 0.3);
+      --secondary: #a855f7;
+      
+      --text: #fafafa;
+      --text-muted: #a1a1aa;
+      --text-dim: #71717a;
+      
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      
+      --font-display: 'Space Grotesk', system-ui, sans-serif;
+      --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      
+      --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+      --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+      --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+      
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 16px;
+      --radius-xl: 24px;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      outline: none;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      height: 100dvh;
+      width: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      overscroll-behavior: none;
+      overflow: hidden;
+      position: fixed;
+      inset: 0;
+    }
+
+    button, input, textarea, select {
+      font-family: inherit;
+      color: inherit;
+    }
+
+    h1, h2, h3, .brand {
+      font-family: var(--font-display);
+      margin: 0;
+      font-weight: 700;
+    }
+
+    button {
+      border: none;
+      cursor: pointer;
+      background: none;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    button:active {
+      transform: scale(0.96);
+    }
+
+    /* ---------- Scrollbar ---------- */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--border-bright);
+      border-radius: 10px;
+    }
+
+    /* ---------- Utilities ---------- */
+    .glass {
+      background: rgba(24, 24, 27, 0.7);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+    }
+
+    /* ---------- Gate & Account Setup ---------- */
+    .screen-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .screen-overlay::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: 
+        radial-gradient(circle at 50% -20%, var(--primary-glow), transparent 70%),
+        radial-gradient(circle at 0% 100%, rgba(168, 85, 247, 0.15), transparent 50%);
+      pointer-events: none;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 400px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 32px;
+      text-align: center;
+      box-shadow: var(--shadow-xl);
+      position: relative;
+      z-index: 1;
+    }
+
+    .card-icon {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 24px;
+      background: var(--surface-raised);
+      border: 1px solid var(--border-bright);
+      border-radius: var(--radius-lg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--primary);
+      box-shadow: 0 0 20px var(--primary-glow);
+    }
+
+    .card h1 {
+      font-size: 32px;
+      letter-spacing: -0.03em;
+      margin-bottom: 8px;
+    }
+
+    .card p {
+      color: var(--text-muted);
+      font-size: 15px;
+      margin-bottom: 32px;
+    }
+
+    .input-group {
+      margin-bottom: 16px;
+      text-align: left;
+    }
+
+    .input-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      margin-left: 4px;
+    }
+
+    .input-field {
+      width: 100%;
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+      font-size: 16px;
+      transition: all 0.2s;
+    }
+
+    .input-field:focus {
+      border-color: var(--primary);
+      background: rgba(59, 130, 246, 0.05);
+      box-shadow: 0 0 0 4px var(--primary-glow);
+    }
+
+    .btn-primary {
+      width: 100%;
+      background: var(--primary);
+      color: white;
+      padding: 14px;
+      border-radius: var(--radius-md);
+      font-weight: 600;
+      font-size: 16px;
+      box-shadow: 0 4px 12px var(--primary-glow);
+    }
+
+    .btn-primary:hover {
+      background: #2563eb;
+      transform: translateY(-1px);
+    }
+
+    .color-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .color-option {
+      aspect-ratio: 1;
+      border-radius: 50%;
+      border: 3px solid transparent;
+      padding: 2px;
+    }
+
+    .color-option.selected {
+      border-color: var(--primary);
+    }
+
+    .color-inner {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+    }
+
+    /* ---------- App Shell ---------- */
+    #app {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #map {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+    }
+
+    /* ---------- Top Bar ---------- */
+    #topbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      padding: calc(env(safe-area-inset-top) + 16px) 16px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      pointer-events: none;
+    }
+
+    .brand-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      pointer-events: auto;
+    }
+
+    .brand-logo {
+      width: 36px;
+      height: 36px;
+      background: var(--primary);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      box-shadow: var(--shadow-md);
+    }
+
+    .brand-name {
+      font-size: 20px;
+      letter-spacing: -0.02em;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    .icon-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      color: var(--text);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .icon-btn.active {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+
+    .status-pill {
+      height: 36px;
+      padding: 0 16px;
+      border-radius: 18px;
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: var(--shadow-md);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success);
+    }
+
+    .status-dot.offline {
+      background: var(--danger);
+      box-shadow: 0 0 8px var(--danger);
+    }
+
+    /* ---------- FAB Bar / Dock ---------- */
+    #fabBar {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 100;
+      padding: 16px 16px calc(env(safe-area-inset-bottom) + 16px);
+      display: flex;
+      justify-content: center;
+      pointer-events: none;
+    }
+
+    .dock {
+      display: flex;
+      gap: 4px;
+      padding: 6px;
+      border-radius: var(--radius-xl);
+      pointer-events: auto;
+      box-shadow: var(--shadow-xl), 0 0 0 1px var(--border);
+      max-width: 100%;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .dock::-webkit-scrollbar { display: none; }
+
+    .dock-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-width: 64px;
+      height: 64px;
+      border-radius: var(--radius-lg);
+      color: var(--text-muted);
+      font-size: 10px;
+      font-weight: 600;
+      gap: 4px;
+    }
+
+    .dock-item i {
+      width: 20px;
+      height: 20px;
+    }
+
+    .dock-item.active {
+      background: var(--surface-raised);
+      color: var(--primary);
+    }
+
+    .dock-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+    }
+
+    .dock-divider {
+      width: 1px;
+      height: 32px;
+      background: var(--border);
+      align-self: center;
+      margin: 0 4px;
+    }
+
+    /* ---------- Modals & Sheets ---------- */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    .modal-overlay.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .sheet {
+      width: 100%;
+      max-width: 500px;
+      background: var(--surface);
+      border-top: 1px solid var(--border-bright);
+      border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+      padding: 24px 24px calc(env(safe-area-inset-bottom) + 24px);
+      transform: translateY(100%);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-overlay.open .sheet {
+      transform: translateY(0);
+    }
+
+    .sheet-handle {
+      width: 40px;
+      height: 4px;
+      background: var(--border-bright);
+      border-radius: 2px;
+      margin: -12px auto 20px;
+    }
+
+    .sheet-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+
+    .sheet h2 {
+      font-size: 20px;
+      letter-spacing: -0.01em;
+    }
+
+    .chip-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .chip {
+      padding: 8px 16px;
+      border-radius: 100px;
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .chip.active {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+
+    /* ---------- Leaflet Customization ---------- */
+    .leaflet-popup-content-wrapper {
+      background: var(--surface);
+      color: var(--text);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-bright);
+      padding: 0;
+      overflow: hidden;
+      box-shadow: var(--shadow-xl);
+    }
+
+    .leaflet-popup-content {
+      margin: 0;
+      width: 240px !important;
+    }
+
+    .popup-container {
+      padding: 16px;
+    }
+
+    .popup-header {
+      margin-bottom: 12px;
+    }
+
+    .popup-tag {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--primary);
+      margin-bottom: 4px;
+    }
+
+    .popup-title {
+      font-size: 16px;
+      font-weight: 700;
+      font-family: var(--font-display);
+    }
+
+    .popup-body {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+
+    .popup-footer {
+      display: flex;
+      gap: 12px;
+      border-top: 1px solid var(--border);
+      padding-top: 12px;
+    }
+
+    .popup-btn {
+      font-size: 13px;
+      font-weight: 600;
+      padding: 4px 0;
+    }
+
+    .popup-btn.edit { color: var(--primary); }
+    .popup-btn.delete { color: var(--danger); }
+
+    .leaflet-popup-tip {
+      background: var(--surface);
+      border: 1px solid var(--border-bright);
+    }
+
+    /* ---------- Notepad Modernization ---------- */
+    .notepad-container {
+      display: flex;
+      flex-direction: column;
+      height: 60vh;
+    }
+
+    .tab-bar {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 12px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tab {
+      padding: 8px 16px;
+      border-radius: var(--radius-md);
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      font-size: 14px;
+      font-weight: 600;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tab.active {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+
+    .notepad-editor {
+      flex: 1;
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      font-size: 15px;
+      line-height: 1.6;
+      resize: none;
+      color: var(--text);
+    }
+
+    /* ---------- Animations ---------- */
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .animate-fade { animation: fadeIn 0.3s ease; }
+    .animate-slide { animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+
+    /* ---------- Mobile Specific ---------- */
+    @media (max-width: 640px) {
+      .card { padding: 24px; }
+      .sheet { max-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Gate Screen -->
+  <div id="gate" class="screen-overlay">
+    <div class="card animate-slide" id="gateCard">
+      <div class="card-icon">
+        <i data-lucide="map-pin"></i>
+      </div>
+      <h1>Waypoint</h1>
+      <p>Secure collaborative mapping for you and your friends.</p>
+      
+      <div class="input-group">
+        <label for="passInput">ACCESS PASSCODE</label>
+        <input type="password" id="passInput" class="input-field" placeholder="••••••">
+      </div>
+      
+      <button class="btn-primary" onclick="tryUnlock()">
+        Unlock Map
+      </button>
+      
+      <div id="gateError" style="color: var(--danger); font-size: 13px; margin-top: 16px;" hidden>
+        Incorrect passcode. Please try again.
+      </div>
+    </div>
+  </div>
+
+  <!-- Account Setup Screen -->
+  <div id="accountSetup" class="screen-overlay" hidden>
+    <div class="card animate-slide">
+      <div class="card-icon" style="color: var(--secondary); box-shadow: 0 0 20px rgba(168, 85, 247, 0.3);">
+        <i data-lucide="user"></i>
+      </div>
+      <h1>Identify Yourself</h1>
+      <p>Choose how you'll appear to others on the map.</p>
+      
+      <div class="input-group">
+        <label for="accountNameInput">DISPLAY NAME</label>
+        <input type="text" id="accountNameInput" class="input-field" placeholder="Enter your name">
+      </div>
+
+      <div class="input-group">
+        <label>CHOOSE YOUR COLOR</label>
+        <div class="color-grid" id="colorSwatchRow">
+          <!-- Swatches injected by JS -->
+        </div>
+      </div>
+      
+      <button class="btn-primary" onclick="saveAccount()" style="background: var(--secondary); box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);">
+        Start Mapping
+      </button>
+    </div>
+  </div>
+
+  <!-- App Main Shell -->
+  <div id="app" hidden>
+    <!-- Map Container -->
+    <div id="map"></div>
+
+    <!-- Top Bar -->
+    <div id="topbar">
+      <div class="brand-container">
+        <div class="brand-logo">
+          <i data-lucide="navigation"></i>
+        </div>
+        <h1 class="brand-name">Waypoint</h1>
+      </div>
+
+      <div class="top-actions">
+        <div class="status-pill glass">
+          <div class="status-dot" id="liveDot"></div>
+          <span id="liveStatusText">Live</span>
+        </div>
+        
+        <button class="icon-btn glass" id="satToggle" onclick="toggleBasemap()" title="Toggle Satellite">
+          <i data-lucide="layers"></i>
+        </button>
+        
+        <button class="icon-btn glass" id="shareToggle" onclick="toggleSharing()" title="Share Location">
+          <i data-lucide="map-pin"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- FAB Dock -->
+    <div id="fabBar">
+      <div class="dock glass">
+        <button class="dock-item" onclick="startDrawPoint()">
+          <i data-lucide="plus-circle"></i>
+          <span>Add Spot</span>
+        </button>
+        <button class="dock-item" onclick="startDrawPath()">
+          <i data-lucide="route"></i>
+          <span>Path</span>
+        </button>
+        <div class="dock-divider"></div>
+        <button class="dock-item" onclick="openDrawer()">
+          <i data-lucide="list"></i>
+          <span>List</span>
+        </button>
+        <button class="dock-item" onclick="openNotepad()">
+          <i data-lucide="sticky-note"></i>
+          <span>Notes</span>
+        </button>
+        <button class="dock-item" onclick="locateMe()">
+          <i data-lucide="crosshair"></i>
+          <span>Center</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modals & Sheets -->
+  
+  <!-- Add/Edit Item Sheet -->
+  <div class="modal-overlay" id="itemModalOverlay" onclick="if(event.target===this) closeItemModal()">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <h2 id="modalTitle">New Location</h2>
+        <button onclick="closeItemModal()"><i data-lucide="x"></i></button>
+      </div>
+      
+      <div class="input-group">
+        <label>CATEGORY</label>
+        <div class="chip-group" id="categoryChips">
+          <!-- Chips injected by JS -->
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label>NAME / LABEL</label>
+        <input type="text" id="labelInput" class="input-field" placeholder="e.g. Hidden Garden">
+      </div>
+
+      <div class="input-group">
+        <label>NOTES (OPTIONAL)</label>
+        <textarea id="notesInput" class="input-field" style="height: 80px; resize: none;" placeholder="Any extra details..."></textarea>
+      </div>
+
+      <div class="modal-actions" style="display: flex; gap: 12px; margin-top: 8px;">
+        <button class="btn-primary" onclick="saveItem()" style="flex: 2;">Save Location</button>
+        <button class="btn-primary" onclick="closeItemModal()" style="flex: 1; background: var(--surface-raised); color: var(--text); box-shadow: none;">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notepad Sheet -->
+  <div class="modal-overlay" id="notepadOverlay" onclick="if(event.target===this) closeNotepad()">
+    <div class="sheet" style="max-width: 600px;">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <h2>Shared Notebook</h2>
+        <div style="display: flex; gap: 8px;">
+          <button class="icon-btn" style="width: 32px; height: 32px; background: var(--surface-raised);" onclick="promptNewTab()">
+            <i data-lucide="plus" style="width: 16px;"></i>
+          </button>
+          <button onclick="closeNotepad()"><i data-lucide="x"></i></button>
+        </div>
+      </div>
+
+      <div class="notepad-container">
+        <div class="tab-bar" id="notepadTabs">
+          <!-- Tabs injected by JS -->
+        </div>
+        <textarea id="notepadText" class="notepad-editor" placeholder="Start writing something shared..."></textarea>
+        <div id="notepadStatus" style="font-size: 11px; color: var(--text-dim); margin-top: 8px; text-align: right;">
+          All changes saved.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- List Drawer -->
+  <div class="modal-overlay" id="drawerOverlay" onclick="if(event.target===this) closeDrawer()">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <div style="display: flex; gap: 16px;">
+          <button class="drawer-tab active" id="tabMap" onclick="switchDrawerTab('map')">Map Items</button>
+          <button class="drawer-tab" id="tabActivity" onclick="switchDrawerTab('activity')">Activity</button>
+        </div>
+        <button onclick="closeDrawer()"><i data-lucide="x"></i></button>
+      </div>
+
+      <div class="input-group" style="margin-bottom: 12px;">
+        <input type="text" id="searchInput" class="input-field" placeholder="Search items..." oninput="renderList()">
+      </div>
+
+      <div id="drawerList" style="max-height: 50vh; overflow-y: auto;">
+        <!-- List items injected by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/12.15.0/firebase-app-compat.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/12.15.0/firebase-database-compat.min.js"></script>
+
+  <script>
+    // Initialize Lucide Icons
+    lucide.createIcons();
+
+    /* ============ CONFIG & FIREBASE ============ */
+    const PASSCODE = "admin67";
+    const FALLBACK_CENTER = [52.2698, -8.2680];
+    
+    const firebaseConfig = {
+      apiKey: "AIzaSyCjsyEADMSSxkEEaUD_t9XDBxvs7CsOjb8",
+      authDomain: "themap67-9f694.firebaseapp.com",
+      databaseURL: "https://themap67-9f694-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "themap67-9f694"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const itemsRef = firebase.database().ref("items");
+
+    const CATEGORIES = {
+      shortcut:     { label: "Shortcut",      color: "#3b82f6", icon: "zap" },
+      possiblepath: { label: "Path",          color: "#a855f7", icon: "move" },
+      escaperoute:  { label: "Escape",        color: "#10b981", icon: "wind" },
+      spot:         { label: "Spot",          color: "#f59e0b", icon: "map-pin" },
+      togo:         { label: "To Go",         color: "#84cc16", icon: "flag" },
+      hazard:       { label: "Hazard",        color: "#ef4444", icon: "alert-triangle" },
+      other:        { label: "Other",         color: "#71717a", icon: "more-horizontal" }
+    };
+
+    const ACCOUNT_COLORS = ["#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#a855f7", "#06b6d4", "#f97316", "#ec4899"];
+
+    /* ============ STATE ============ */
+    let map, itemsLayer;
+    let items = [];
+    let mode = null;
+    let drawingPoints = [];
+    let tempDrawLayer = null;
+    let selectedCategory = "spot";
+    let accountName = localStorage.getItem("waypoint-account-name") || "";
+    let accountColor = localStorage.getItem("waypoint-account-color") || "";
+    let selectedAccountColor = accountColor || ACCOUNT_COLORS[0];
+    let deviceId = localStorage.getItem("waypoint-device-id") || "d" + Math.random().toString(36).slice(2, 9);
+    localStorage.setItem("waypoint-device-id", deviceId);
+
+    /* ============ UI HELPERS ============ */
+    function showModal(id) {
+      const el = document.getElementById(id);
+      el.classList.add('open');
+      el.hidden = false;
+    }
+
+    function closeModal(id) {
+      const el = document.getElementById(id);
+      el.classList.remove('open');
+      setTimeout(() => { if(!el.classList.contains('open')) el.hidden = true; }, 300);
+    }
+
+    function showToast(msg) {
+      // Simplified toast for this demo
+      console.log("TOAST:", msg);
+    }
+
+    /* ============ GATE & ACCOUNT ============ */
+    function tryUnlock() {
+      const val = document.getElementById("passInput").value.trim().toLowerCase();
+      if (val === PASSCODE.toLowerCase()) {
+        document.getElementById("gate").style.opacity = "0";
+        setTimeout(() => {
+          document.getElementById("gate").style.display = "none";
+          if (!accountName) {
+            document.getElementById("accountSetup").hidden = false;
+            renderColorSwatches();
+          } else {
+            enterApp();
+          }
+        }, 300);
+      } else {
+        document.getElementById("gateError").hidden = false;
+        document.getElementById("gateCard").style.animation = "none";
+        void document.getElementById("gateCard").offsetWidth;
+        document.getElementById("gateCard").style.animation = "shake 0.5s";
+      }
+    }
+
+    function renderColorSwatches() {
+      const row = document.getElementById("colorSwatchRow");
+      row.innerHTML = "";
+      ACCOUNT_COLORS.forEach(c => {
+        const btn = document.createElement("button");
+        btn.className = "color-option" + (c === selectedAccountColor ? " selected" : "");
+        btn.innerHTML = `<div class="color-inner" style="background: ${c}"></div>`;
+        btn.onclick = () => {
+          selectedAccountColor = c;
+          renderColorSwatches();
+        };
+        row.appendChild(btn);
+      });
+    }
+
+    function saveAccount() {
+      const name = document.getElementById("accountNameInput").value.trim();
+      if (!name) return;
+      accountName = name;
+      accountColor = selectedAccountColor;
+      localStorage.setItem("waypoint-account-name", name);
+      localStorage.setItem("waypoint-account-color", accountColor);
+      document.getElementById("accountSetup").style.display = "none";
+      enterApp();
+    }
+
+    function enterApp() {
+      document.getElementById("app").hidden = false;
+      initMap();
+      startSync();
+      lucide.createIcons();
+    }
+
+    /* ============ MAP LOGIC ============ */
+    let streetLayer, satLayer, satOn = false;
+
+    function initMap() {
+      map = L.map("map", { zoomControl: false, attributionControl: false }).setView(FALLBACK_CENTER, 14);
+      streetLayer = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png").addTo(map);
+      satLayer = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}");
+      itemsLayer = L.layerGroup().addTo(map);
+      
+      map.on("click", onMapClick);
+      locateMe(true);
+    }
+
+    function toggleBasemap() {
+      satOn = !satOn;
+      if (satOn) {
+        map.removeLayer(streetLayer);
+        satLayer.addTo(map);
+      } else {
+        map.removeLayer(satLayer);
+        streetLayer.addTo(map);
+      }
+      document.getElementById("satToggle").classList.toggle("active", satOn);
+    }
+
+    function locateMe(silent) {
+      navigator.geolocation.getCurrentPosition(pos => {
+        const coords = [pos.coords.latitude, pos.coords.longitude];
+        map.setView(coords, 15);
+      }, err => {
+        if(!silent) alert("Location access denied.");
+      });
+    }
+
+    function onMapClick(e) {
+      if (mode === 'point') {
+        openItemModal(e.latlng);
+      } else if (mode === 'path') {
+        drawingPoints.push([e.latlng.lat, e.latlng.lng]);
+        renderTempPath();
+      }
+    }
+
+    /* ============ ITEM MANAGEMENT ============ */
+    let pendingLatLng = null;
+
+    function startDrawPoint() {
+      mode = 'point';
+      showToast("Tap anywhere on the map to add a spot.");
+    }
+
+    function startDrawPath() {
+      mode = 'path';
+      drawingPoints = [];
+      showToast("Tap multiple points to draw a path, then save.");
+    }
+
+    function openItemModal(latlng) {
+      pendingLatLng = latlng;
+      renderCategoryChips();
+      showModal("itemModalOverlay");
+    }
+
+    function closeItemModal() {
+      closeModal("itemModalOverlay");
+      mode = null;
+    }
+
+    function renderCategoryChips() {
+      const container = document.getElementById("categoryChips");
+      container.innerHTML = "";
+      Object.keys(CATEGORIES).forEach(key => {
+        const cat = CATEGORIES[key];
+        const chip = document.createElement("button");
+        chip.className = "chip" + (selectedCategory === key ? " active" : "");
+        chip.innerHTML = `<i data-lucide="${cat.icon}" style="width:14px;height:14px;"></i> ${cat.label}`;
+        chip.onclick = () => {
+          selectedCategory = key;
+          renderCategoryChips();
+        };
+        container.appendChild(chip);
+      });
+      lucide.createIcons();
+    }
+
+    function saveItem() {
+      const label = document.getElementById("labelInput").value.trim() || "Untitled";
+      const notes = document.getElementById("notesInput").value.trim();
+      
+      const newItem = {
+        type: mode === 'path' ? 'polyline' : 'marker',
+        category: selectedCategory,
+        label: label,
+        notes: notes,
+        coords: mode === 'path' ? drawingPoints : [pendingLatLng.lat, pendingLatLng.lng],
+        author: accountName,
+        authorColor: accountColor,
+        timestamp: Date.now()
+      };
+
+      itemsRef.push(newItem);
+      closeItemModal();
+      mode = null;
+      drawingPoints = [];
+      if(tempDrawLayer) map.removeLayer(tempDrawLayer);
+    }
+
+    function startSync() {
+      itemsRef.on("value", snap => {
+        const data = snap.val();
+        items = data ? Object.keys(data).map(id => ({ id, ...data[id] })) : [];
+        renderItems();
+      });
+    }
+
+    function renderItems() {
+      itemsLayer.clearLayers();
+      items.forEach(item => {
+        const cat = CATEGORIES[item.category] || CATEGORIES.other;
+        let layer;
+
+        if (item.type === 'polyline') {
+          layer = L.polyline(item.coords, { color: cat.color, weight: 4, opacity: 0.8 });
+        } else {
+          const icon = L.divIcon({
+            className: '',
+            html: `<div style="background:${cat.color}; width:12px; height:12px; border-radius:50%; border:2px solid white; box-shadow:0 0 10px ${cat.color}88;"></div>`,
+            iconSize: [12, 12],
+            iconAnchor: [6, 6]
+          });
+          layer = L.marker(item.coords, { icon });
+        }
+
+        const popupContent = `
+          <div class="popup-container">
+            <div class="popup-header">
+              <div class="popup-tag" style="color:${cat.color}">${cat.label}</div>
+              <div class="popup-title">${item.label}</div>
+            </div>
+            <div class="popup-body">${item.notes || 'No additional notes.'}</div>
+            <div style="font-size:10px; color:var(--text-dim); margin-bottom:8px;">Added by ${item.author}</div>
+            <div class="popup-footer">
+              <button class="popup-btn delete" onclick="deleteItem('${item.id}')">Delete</button>
+            </div>
+          </div>
+        `;
+
+        layer.bindPopup(popupContent);
+        layer.addTo(itemsLayer);
+      });
+    }
+
+    function deleteItem(id) {
+      if(confirm("Delete this item?")) {
+        itemsRef.child(id).remove();
+      }
+    }
+
+    function renderTempPath() {
+      if(tempDrawLayer) map.removeLayer(tempDrawLayer);
+      if(drawingPoints.length > 1) {
+        tempDrawLayer = L.polyline(drawingPoints, { color: 'white', dashArray: '5, 10', weight: 2 }).addTo(map);
+      }
+    }
+
+    /* ============ DRAWER & NOTEPAD ============ */
+    function openDrawer() { showModal("drawerOverlay"); renderList(); }
+    function closeDrawer() { closeModal("drawerOverlay"); }
+    
+    function openNotepad() { showModal("notepadOverlay"); }
+    function closeNotepad() { closeModal("notepadOverlay"); }
+
+    function switchDrawerTab(tab) {
+      document.getElementById("tabMap").classList.toggle("active", tab === 'map');
+      document.getElementById("tabActivity").classList.toggle("active", tab === 'activity');
+      renderList();
+    }
+
+    function renderList() {
+      const container = document.getElementById("drawerList");
+      const search = document.getElementById("searchInput").value.toLowerCase();
+      container.innerHTML = "";
+      
+      items.filter(it => it.label.toLowerCase().includes(search)).forEach(item => {
+        const cat = CATEGORIES[item.category] || CATEGORIES.other;
+        const div = document.createElement("div");
+        div.style.padding = "12px";
+        div.style.borderBottom = "1px solid var(--border)";
+        div.style.display = "flex";
+        div.style.alignItems = "center";
+        div.style.gap = "12px";
+        div.innerHTML = `
+          <div style="width:8px; height:8px; border-radius:50%; background:${cat.color}"></div>
+          <div style="flex:1">
+            <div style="font-size:14px; font-weight:600;">${item.label}</div>
+            <div style="font-size:12px; color:var(--text-dim)">${cat.label} • by ${item.author}</div>
+          </div>
+        `;
+        div.onclick = () => {
+          map.setView(item.type === 'polyline' ? item.coords[0] : item.coords, 16);
+          closeDrawer();
+        };
+        container.appendChild(div);
+      });
+    }
+
+    // Shake animation for errors
+    const style = document.createElement('style');
+    style.innerHTML = `
+      @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-8px); }
+        75% { transform: translateX(8px); }
+      }
+    `;
+    document.head.appendChild(style);
+
+  </script>
+</body>
+</html>
