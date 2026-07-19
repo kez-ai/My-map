@@ -1,0 +1,1813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Waypoint</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Waypoint">
+<meta name="theme-color" content="#0B0C10">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{
+  --bg:#050609;
+  --surface: rgba(255,255,255,0.03);
+  --surface2: rgba(255,255,255,0.05);
+  --surface2-solid:#0E1116;
+  --surface3: rgba(255,255,255,0.075);
+
+  --ink:#F5F6F9;
+  --ink-muted: rgba(245,246,249,0.56);
+  --ink-faint: rgba(245,246,249,0.32);
+
+  --amber:#4FA3FF;
+  --amber-glow: rgba(79,163,255,0.35);
+  --amber-soft: rgba(79,163,255,0.10);
+  --moss:#F2B33D;
+  --rust:#FF5E7A;
+
+  --line: rgba(255,255,255,0.07);
+  --line-strong: rgba(255,255,255,0.12);
+  --shadow-sm: 0 2px 10px rgba(0,0,0,0.35);
+  --shadow-md: 0 10px 30px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3);
+  --shadow-lg: 0 24px 60px rgba(0,0,0,0.55), 0 8px 20px rgba(0,0,0,0.3);
+
+  --radius-sm:12px;
+  --radius-md:16px;
+  --radius-lg:20px;
+  --radius-xl:24px;
+
+  --ease: cubic-bezier(0.16,1,0.3,1);
+  --spring: cubic-bezier(0.34,1.56,0.64,1);
+  --blur: blur(24px) saturate(180%);
+  --blur-sm: blur(14px) saturate(160%);
+
+  --font-display:'Space Grotesk', system-ui, sans-serif;
+  --font-body:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono:'Space Mono', 'SF Mono', 'Courier New', monospace;
+
+  --contour:
+    repeating-radial-gradient(circle at 12% 20%, transparent 0, transparent 29px, rgba(79,163,255,0.05) 30px, transparent 31px),
+    repeating-radial-gradient(circle at 88% 74%, transparent 0, transparent 37px, rgba(79,163,255,0.04) 38px, transparent 39px),
+    repeating-radial-gradient(circle at 50% 96%, transparent 0, transparent 46px, rgba(242,179,61,0.03) 47px, transparent 48px);
+}
+*{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body{
+  margin:0; padding:0; height:100vh; height:100dvh; width:100%;
+  background:var(--bg); color:var(--ink); font-family:var(--font-body);
+  overscroll-behavior:none; overflow:hidden; position:fixed; inset:0;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+}
+button, input, textarea, select{ font-family:var(--font-body); }
+h1,h2,.brand{ font-family:var(--font-display); margin:0; letter-spacing:-0.01em; }
+button{ border:none; cursor:pointer; -webkit-tap-highlight-color:transparent; font-family:inherit; }
+
+/* ---------- Gate ---------- */
+#gate{
+  position:fixed; inset:0; z-index:100;
+  background:
+    radial-gradient(ellipse 90% 60% at 50% 8%, rgba(79,163,255,0.22), transparent 60%),
+    radial-gradient(circle at 85% 85%, rgba(242,179,61,0.10), transparent 50%),
+    var(--contour), var(--bg);
+  display:flex; align-items:center; justify-content:center; padding:24px;
+  animation:fadeIn 0.5s var(--ease);
+}
+.account-setup{
+  position:fixed; inset:0; z-index:100;
+  background:
+    radial-gradient(ellipse 90% 60% at 50% 8%, rgba(79,163,255,0.22), transparent 60%),
+    radial-gradient(circle at 85% 85%, rgba(242,179,61,0.10), transparent 50%),
+    var(--contour), var(--bg);
+  display:flex; align-items:center; justify-content:center; padding:24px;
+  animation:fadeIn 0.4s var(--ease);
+}
+@keyframes fadeIn{ from{ opacity:0; } to{ opacity:1; } }
+.color-swatch-row{ display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin:20px 0 28px; }
+.color-swatch{
+  width:38px; height:38px; border-radius:50%; border:2px solid transparent;
+  box-shadow:0 4px 12px rgba(0,0,0,0.35), inset 0 1px 1px rgba(255,255,255,0.25);
+  transition:transform 0.25s var(--spring), box-shadow 0.2s var(--ease);
+}
+.color-swatch:active{ transform:scale(0.9); }
+.color-swatch.selected{ border-color:#fff; transform:scale(1.16); box-shadow:0 4px 16px rgba(0,0,0,0.4), 0 0 0 4px rgba(255,255,255,0.1); }
+.gate-card{ width:100%; max-width:360px; text-align:center; }
+.gate-mark{
+  width:64px; height:64px; margin:0 auto 24px; border-radius:var(--radius-lg);
+  background:linear-gradient(160deg, rgba(255,255,255,0.09), rgba(255,255,255,0.02));
+  border:1px solid var(--line-strong);
+  backdrop-filter:var(--blur); -webkit-backdrop-filter:var(--blur);
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 0 0 1px rgba(255,255,255,0.04) inset, 0 12px 32px rgba(79,163,255,0.22), var(--shadow-md);
+  animation:markFloat 4s ease-in-out infinite;
+}
+@keyframes markFloat{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-5px); } }
+.gate-mark svg{ width:28px; height:28px; color:var(--amber); filter:drop-shadow(0 0 8px var(--amber-glow)); }
+.gate-card h1{ font-size:34px; font-weight:700; letter-spacing:-0.03em; color:var(--ink); }
+.gate-sub{ color:var(--ink-muted); margin:10px 0 32px; font-size:14.5px; font-weight:450; }
+#passInput{
+  width:100%; padding:17px 18px; border-radius:var(--radius-md); border:1px solid var(--line-strong);
+  background:var(--surface2); backdrop-filter:var(--blur-sm); -webkit-backdrop-filter:var(--blur-sm);
+  color:var(--ink); font-size:17px; text-align:center; font-weight:500;
+  letter-spacing:0.1em; outline:none; margin-bottom:16px;
+  box-shadow:0 2px 12px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.04);
+  transition:border-color 0.2s var(--ease), box-shadow 0.2s var(--ease), transform 0.15s var(--ease);
+}
+#passInput:focus{ border-color:var(--amber); box-shadow:0 0 0 4px var(--amber-soft), 0 4px 20px rgba(79,163,255,0.2); transform:translateY(-1px); }
+.gate-card.shake #passInput{ border-color:var(--rust); box-shadow:0 0 0 4px rgba(255,94,122,0.16); }
+@keyframes gateShake{
+  10%,90%{ transform:translateX(-1px); }
+  20%,80%{ transform:translateX(2px); }
+  30%,50%,70%{ transform:translateX(-5px); }
+  40%,60%{ transform:translateX(5px); }
+}
+.gate-card.shake{ animation:gateShake 0.45s var(--ease); }
+.btn-primary{
+  width:100%; padding:16px 18px; border-radius:var(--radius-md);
+  background:linear-gradient(160deg, #6DB8FF, var(--amber) 55%, #2E7FDB);
+  color:#0B0C10; font-weight:700; font-size:15.5px; letter-spacing:-0.01em;
+  box-shadow:0 8px 24px rgba(79,163,255,0.35), inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -2px 4px rgba(0,0,0,0.1);
+  transition:transform 0.18s var(--spring), box-shadow 0.2s var(--ease), filter 0.15s;
+}
+.btn-primary:active{ transform:scale(0.97); box-shadow:0 4px 14px rgba(79,163,255,0.3); filter:brightness(0.96); }
+.gate-error{ color:var(--rust); font-size:13px; margin-top:16px; font-weight:500; }
+
+/* ---------- App shell ---------- */
+#app{ position:fixed; inset:0; }
+#map{ position:absolute; inset:0; background:var(--bg); z-index:1; }
+.leaflet-popup-content-wrapper{
+  background:var(--surface2-solid); color:var(--ink); border-radius:var(--radius-md);
+  box-shadow:var(--shadow-lg); border:1px solid var(--line-strong);
+}
+.leaflet-popup-tip{ background:var(--surface2-solid); box-shadow:none; }
+.leaflet-popup-content{ margin:0; min-width:184px; }
+.popup{ padding:15px 16px 15px 14px; }
+.leaflet-container a.leaflet-popup-close-button{ color:var(--ink-muted); padding:8px 9px 0 0; transition:color 0.15s; }
+.popup-cat{ font-family:var(--font-mono); font-size:10px; font-weight:700; letter-spacing:0.12em; margin-bottom:4px; }
+.popup-label{ font-size:16px; font-weight:700; margin-bottom:5px; letter-spacing:-0.01em; }
+.popup-notes{ font-size:13px; color:var(--ink-muted); margin-bottom:11px; line-height:1.5; }
+.popup-measure{ font-family:var(--font-mono); font-size:12px; color:var(--amber); font-weight:700; margin-bottom:8px; }
+.popup-addedby{ display:flex; align-items:center; gap:7px; font-size:11.5px; color:var(--ink-muted); margin-bottom:12px; }
+.popup-actions{ display:flex; gap:8px; margin-top:2px; }
+.popup-edit, .popup-delete{
+  flex:1; text-align:center; font-size:12.5px; padding:8px 0; font-weight:700; border-radius:10px;
+  transition:transform 0.15s var(--spring), background 0.15s;
+}
+.popup-edit{ background:var(--amber-soft); color:var(--amber); }
+.popup-delete{ background:rgba(255,94,122,0.12); color:var(--rust); }
+.popup-edit:active, .popup-delete:active{ transform:scale(0.95); }
+
+/* ---------- Top bar ---------- */
+#topbar{
+  position:fixed; top:0; left:0; right:0; z-index:60;
+  padding:calc(env(safe-area-inset-top) + 14px) 16px 12px;
+  display:flex; align-items:center; justify-content:space-between;
+  background:linear-gradient(to bottom, rgba(5,6,9,0.85) 0%, rgba(5,6,9,0.5) 60%, transparent);
+  pointer-events:none;
+}
+#topbar .brand{
+  font-size:18px; font-weight:700; letter-spacing:-0.02em; color:var(--ink); pointer-events:auto;
+  display:flex; align-items:center; gap:8px; text-shadow:0 2px 12px rgba(0,0,0,0.4);
+}
+.brand-mark{ width:18px; height:18px; color:var(--amber); flex-shrink:0; filter:drop-shadow(0 0 6px var(--amber-glow)); }
+.live-badge{
+  display:flex; align-items:center; gap:7px; background:var(--surface2);
+  backdrop-filter:var(--blur-sm); -webkit-backdrop-filter:var(--blur-sm);
+  border:1px solid var(--line-strong); border-radius:20px; padding:9px 13px;
+  font-family:var(--font-mono); font-size:10px; font-weight:700;
+  letter-spacing:0.07em; text-transform:uppercase; color:var(--ink-muted);
+  pointer-events:auto; box-shadow:var(--shadow-sm);
+}
+.live-dot{ width:7px; height:7px; border-radius:50%; background:var(--moss); transition:background 0.2s; box-shadow:0 0 8px currentColor; }
+.live-dot.offline{ background:var(--rust); }
+.icon-btn{
+  width:42px; height:42px; border-radius:21px; background:var(--surface2);
+  backdrop-filter:var(--blur-sm); -webkit-backdrop-filter:var(--blur-sm);
+  color:var(--ink); display:flex; align-items:center; justify-content:center;
+  pointer-events:auto; border:1px solid var(--line-strong); box-shadow:var(--shadow-sm);
+  transition:transform 0.18s var(--spring), background 0.2s var(--ease), color 0.2s var(--ease), box-shadow 0.2s;
+}
+.icon-btn:active{ transform:scale(0.9); }
+.icon-btn svg{ width:18px; height:18px; }
+.icon-btn.active{ background:linear-gradient(160deg,#6DB8FF,var(--amber)); color:#0B0C10; border-color:transparent; box-shadow:0 4px 16px rgba(79,163,255,0.4); }
+
+/* ---------- Banners ---------- */
+.banner{
+  position:fixed; left:16px; right:16px; z-index:55;
+  top:calc(env(safe-area-inset-top) + 68px);
+  background:var(--surface2); backdrop-filter:var(--blur); -webkit-backdrop-filter:var(--blur);
+  border:1px solid var(--line-strong); border-radius:var(--radius-md);
+  padding:14px 16px; font-size:13px; color:var(--ink-muted); box-shadow:var(--shadow-md);
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  animation:bannerIn 0.3s var(--ease);
+}
+@keyframes bannerIn{ from{ opacity:0; transform:translateY(-8px); } to{ opacity:1; transform:translateY(0); } }
+.banner strong{ color:var(--ink); }
+.draw-banner-actions{ display:flex; gap:8px; }
+.banner button{
+  background:var(--surface3); color:var(--ink); font-size:12px; font-weight:700; padding:9px 13px;
+  border-radius:10px; transition:transform 0.15s var(--spring);
+}
+.banner button:active{ transform:scale(0.93); }
+.banner button.primary{ background:linear-gradient(160deg,#6DB8FF,var(--amber)); color:#0B0C10; }
+
+/* ---------- FAB bar ---------- */
+#fabBar{
+  position:fixed; left:0; right:0; bottom:0; z-index:60;
+  padding:10px 16px calc(env(safe-area-inset-bottom) + 16px);
+  display:flex; justify-content:center;
+  background:linear-gradient(to top, rgba(5,6,9,0.9) 0%, rgba(5,6,9,0.55) 55%, transparent);
+}
+.fab-row{
+  display:flex; gap:6px; background:var(--surface2); border:1px solid var(--line-strong);
+  backdrop-filter:var(--blur); -webkit-backdrop-filter:var(--blur);
+  border-radius:26px; padding:8px; align-items:stretch;
+  box-shadow:var(--shadow-lg), 0 0 24px rgba(79,163,255,0.08);
+  max-width:calc(100vw - 32px); overflow-x:auto; scrollbar-width:none; touch-action:pan-x;
+}
+.fab-row::-webkit-scrollbar{ display:none; }
+.fab{ touch-action:none;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:5px; width:62px; flex-shrink:0; padding:10px 4px; border-radius:18px; background:transparent;
+  color:var(--ink-muted); font-size:10px; font-weight:600; letter-spacing:-0.01em;
+  transition:background 0.2s var(--ease), color 0.2s var(--ease), transform 0.18s var(--spring);
+}
+.fab:active{ transform:scale(0.9); }
+.fab svg{ width:21px; height:21px; transition:transform 0.2s var(--spring); }
+.fab.active{ background:var(--surface3); color:var(--amber); }
+.fab.active svg{ transform:scale(1.1); filter:drop-shadow(0 0 6px var(--amber-glow)); }
+.fab.dragging{ opacity:0.6; transform:scale(1.15); background:var(--surface3); box-shadow:var(--shadow-lg); z-index:5; }
+
+/* ---------- Modal / confirm ---------- */
+.overlay{
+  position:fixed; inset:0; z-index:90; background:rgba(4,5,8,0.6);
+  backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  display:flex; align-items:flex-end; justify-content:center;
+  animation:overlayFade 0.25s var(--ease);
+}
+@keyframes overlayFade{ from{ opacity:0; } to{ opacity:1; } }
+.sheet{
+  width:100%; max-width:480px; background:var(--surface2-solid);
+  background-image:linear-gradient(160deg, rgba(255,255,255,0.04), transparent 40%);
+  border:1px solid var(--line-strong); border-bottom:none;
+  border-radius:var(--radius-xl) var(--radius-xl) 0 0;
+  padding:24px 22px calc(env(safe-area-inset-bottom) + 22px); box-shadow:var(--shadow-lg);
+  animation:sheetUp 0.35s var(--spring);
+}
+@keyframes sheetUp{ from{ transform:translateY(40px); opacity:0; } to{ transform:translateY(0); opacity:1; } }
+.sheet h2{ font-size:19px; font-weight:700; letter-spacing:-0.01em; margin-bottom:16px; }
+.chip-row{ display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+.chip{
+  padding:9px 15px; border-radius:11px; background:var(--surface3); color:var(--ink-muted);
+  font-size:13px; font-weight:700; border:1px solid var(--line-strong);
+  transition:background 0.2s var(--ease), color 0.2s var(--ease), transform 0.15s var(--spring);
+}
+.chip:active{ transform:scale(0.94); }
+.chip.active{ background:var(--chip-color); color:#0B0C10; border-color:var(--chip-color); box-shadow:0 4px 14px rgba(0,0,0,0.3); }
+#labelInput, #notesInput, .text-input{
+  width:100%; padding:14px 16px; border-radius:var(--radius-sm); border:1px solid var(--line-strong);
+  background:var(--surface2); color:var(--ink); font-size:15.5px; outline:none; margin-bottom:12px;
+  transition:border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+#labelInput:focus, #notesInput:focus, .text-input:focus{ border-color:var(--amber); box-shadow:0 0 0 4px var(--amber-soft); }
+.notepad-sheet{ display:flex; flex-direction:column; max-height:78vh; }
+.notepad-header{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+.notepad-header h2{ margin-bottom:0; display:flex; align-items:baseline; gap:8px; }
+.notepad-header-actions{ display:flex; gap:6px; flex-shrink:0; }
+.notepad-edited-by{ display:flex; align-items:center; gap:7px; font-size:11.5px; color:var(--ink-muted); margin:-4px 0 16px; }
+.edited-dot{ width:8px; height:8px; border-radius:50%; flex-shrink:0; box-shadow:0 0 6px currentColor; }
+.notepad-status{ font-family:var(--font-mono); font-size:10px; font-weight:400; color:var(--ink-muted); letter-spacing:0.03em; transition:color 0.2s; }
+.notepad-status.syncing{ color:var(--amber); }
+.tab-row{ display:flex; gap:8px; overflow-x:auto; padding-bottom:12px; margin-bottom:14px; border-bottom:1px solid var(--line); }
+.tab-chip{
+  flex-shrink:0; padding:9px 15px; border-radius:11px; background:var(--surface3); color:var(--ink-muted);
+  font-size:13px; font-weight:700; border:1px solid var(--line-strong); white-space:nowrap;
+  display:flex; align-items:center; gap:7px; transition:transform 0.15s var(--spring), background 0.2s;
+}
+.tab-chip:active{ transform:scale(0.95); }
+.tab-chip.active{ background:var(--tab-color, var(--amber)); color:#0B0C10; border-color:var(--tab-color, var(--amber)); box-shadow:0 4px 14px rgba(0,0,0,0.3); }
+.tab-chip.tab-add{ background:transparent; color:var(--ink-muted); border-style:dashed; }
+.tab-chip-dot{ width:7px; height:7px; border-radius:50%; flex-shrink:0; box-shadow:0 0 6px currentColor; }
+.tab-chip.active .tab-chip-dot{ background:#0B0C10 !important; opacity:0.35; box-shadow:none; }
+#notepadText{
+  width:100%; flex:1; min-height:200px; padding:16px; border-radius:var(--radius-sm); border:1px solid var(--line-strong);
+  background:var(--surface2); color:var(--ink); font-size:15.5px; line-height:1.6; outline:none;
+  resize:none; font-family:var(--font-body); margin-bottom:16px;
+  transition:border-color 0.2s, box-shadow 0.2s;
+}
+#notepadText:focus{ border-color:var(--amber); box-shadow:0 0 0 4px var(--amber-soft); }
+.notepad-view{
+  width:100%; flex:1; min-height:200px; padding:16px; border-radius:var(--radius-sm); border:1px solid var(--line-strong);
+  background:var(--surface2); color:var(--ink); font-size:15.5px; line-height:1.6; margin-bottom:16px;
+  white-space:pre-wrap; word-break:break-word; overflow-y:auto; font-family:var(--font-body); cursor:text;
+}
+.notepad-view.empty{ color:var(--ink-faint); }
+.notepad-line{ display:block; min-height:1.6em; }
+
+/* ---------- Live presence (blue dots) ---------- */
+.friend-dot{
+  width:17px; height:17px; border-radius:50%; background:var(--dot-color, #4FA8F0); border:3px solid #fff;
+  box-shadow:0 3px 10px rgba(0,0,0,0.45), 0 0 0 1px rgba(0,0,0,0.1); position:relative;
+}
+.friend-dot::after{
+  content:''; position:absolute; inset:-9px; border-radius:50%;
+  background:var(--dot-color, #4FA8F0); opacity:0.3; animation:pulseDot 2.2s ease-out infinite;
+}
+@keyframes pulseDot{ 0%{ transform:scale(0.6); opacity:0.9; } 100%{ transform:scale(2.1); opacity:0; } }
+.friend-label{
+  position:absolute; top:22px; left:50%; transform:translateX(-50%); white-space:nowrap;
+  background:var(--surface2-solid); color:var(--ink); font-size:10.5px; font-weight:700;
+  padding:3px 8px; border-radius:7px; border:1px solid var(--line-strong); box-shadow:var(--shadow-sm);
+}
+#notesInput{ resize:none; height:68px; }
+.modal-actions{ display:flex; gap:10px; margin-top:8px; }
+.reshape-btn{ width:100%; padding:13px; border-radius:var(--radius-sm); font-size:13px; font-weight:700; margin-bottom:6px; transition:transform 0.15s var(--spring); }
+.reshape-btn:active{ transform:scale(0.97); }
+.modal-actions button{
+  flex:1; padding:15px; border-radius:var(--radius-sm); font-size:14.5px; font-weight:700;
+  transition:transform 0.18s var(--spring), opacity 0.15s, filter 0.15s;
+}
+.modal-actions button:active{ transform:scale(0.96); filter:brightness(0.95); }
+.btn-ghost{ background:var(--surface3); color:var(--ink); }
+.confirm-sheet p{ color:var(--ink-muted); font-size:14px; margin:0 0 18px; line-height:1.5; }
+.confirm-sheet .modal-actions .btn-danger{ background:linear-gradient(160deg,#FF7A93,var(--rust)); color:#fff; }
+
+/* ---------- Drawer ---------- */
+#drawerOverlay{ align-items:flex-end; }
+.drawer{
+  width:100%; max-width:480px; max-height:74vh; background:var(--surface2-solid);
+  background-image:linear-gradient(160deg, rgba(255,255,255,0.04), transparent 40%);
+  border:1px solid var(--line-strong); border-bottom:none;
+  border-radius:var(--radius-xl) var(--radius-xl) 0 0; padding:12px 18px calc(env(safe-area-inset-bottom) + 18px);
+  display:flex; flex-direction:column; box-shadow:var(--shadow-lg);
+  animation:sheetUp 0.35s var(--spring);
+}
+.drawer-handle{ width:38px; height:5px; background:var(--line-strong); border-radius:3px; margin:4px auto 16px; }
+.drawer h2{ font-size:16px; margin-bottom:10px; display:flex; gap:6px; align-items:baseline; }
+.drawer h2 span{ font-family:var(--font-body); color:var(--ink-muted); font-size:13px; font-weight:400; }
+.drawer-tabs{ display:flex; gap:20px; margin-bottom:14px; }
+.drawer-tab{
+  font-family:var(--font-display); font-size:16px; font-weight:700; color:var(--ink-faint);
+  background:transparent; padding:6px 2px 10px; border-bottom:2.5px solid transparent;
+  transition:color 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+.drawer-tab span{ font-family:var(--font-body); color:var(--ink-muted); font-size:13px; font-weight:400; }
+.drawer-tab.active{ color:var(--ink); border-bottom-color:var(--amber); }
+.drawer-list{ overflow-y:auto; }
+.sort-row{ margin-bottom:12px; }
+.sort-select{
+  width:100%; padding:11px 14px; border-radius:11px; border:1px solid var(--line-strong);
+  background:var(--surface2); color:var(--ink); font-size:13px; font-weight:600; font-family:var(--font-body); outline:none;
+}
+.activity-row{ display:flex; align-items:flex-start; gap:11px; padding:13px 4px; border-bottom:1px solid var(--line); transition:background 0.15s; }
+.activity-row:active{ background:var(--surface2); border-radius:12px; }
+.activity-row .dot{ margin-top:5px; }
+.activity-text{ flex:1; font-size:13.5px; color:var(--ink); line-height:1.45; }
+.activity-who{ font-weight:700; }
+.activity-time{ font-family:var(--font-mono); font-size:10px; color:var(--ink-muted); margin-top:3px; letter-spacing:0.03em; }
+.list-row{ display:flex; align-items:center; gap:13px; padding:13px 6px; border-bottom:1px solid var(--line); transition:background 0.15s, border-radius 0.15s; }
+.list-row:active{ background:var(--surface2); border-radius:12px; }
+.dot{ width:10px; height:10px; border-radius:50%; flex-shrink:0; box-shadow:0 0 6px currentColor; }
+.list-row-text{ flex:1; min-width:0; }
+.list-row-label{ font-size:14.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:-0.005em; }
+.list-row-cat{ font-family:var(--font-mono); font-size:11px; color:var(--ink-muted); letter-spacing:0.02em; margin-top:1px; }
+.icon-btn.small{ width:34px; height:34px; border-radius:17px; background:transparent; border:none; color:var(--ink-muted); box-shadow:none; backdrop-filter:none; -webkit-backdrop-filter:none; }
+.icon-btn.small:active{ background:var(--surface3); }
+.icon-btn.small svg{ width:16px; height:16px; }
+.empty{ color:var(--ink-muted); font-size:13.5px; text-align:center; padding:40px 24px; line-height:1.55; }
+.empty::before{ content:"·"; display:block; font-family:var(--font-display); font-size:32px; color:var(--line-strong); margin-bottom:8px; }
+
+/* ---------- Toast ---------- */
+#toast{
+  position:fixed; left:50%; bottom:126px; transform:translate(-50%,14px) scale(0.94); z-index:70;
+  background:var(--surface2-solid); color:var(--ink); padding:12px 20px; border-radius:14px;
+  font-size:13px; font-weight:600; opacity:0; transition:opacity 0.25s var(--ease), transform 0.25s var(--spring);
+  pointer-events:none; border:1px solid var(--line-strong); white-space:nowrap; box-shadow:var(--shadow-lg);
+}
+#toast.show{ opacity:1; transform:translate(-50%,0) scale(1); }
+#credit{
+  position:fixed; left:16px; z-index:101;
+  top:calc(env(safe-area-inset-top) + 16px);
+  font-size:11px; font-weight:600; color:#fff; opacity:0.75;
+  pointer-events:none; text-shadow:0 1px 6px rgba(0,0,0,0.8); letter-spacing:0.01em;
+}
+.mystery-btn{
+  position:fixed; right:16px; z-index:101;
+  bottom:calc(env(safe-area-inset-bottom) + 16px);
+  width:42px; height:42px; border-radius:50%; background:var(--surface2);
+  backdrop-filter:var(--blur-sm); -webkit-backdrop-filter:var(--blur-sm);
+  border:1px solid var(--line-strong);
+  color:var(--ink-muted); font-size:18px; font-weight:700; font-family:var(--font-display);
+  display:flex; align-items:center; justify-content:center; opacity:0.65;
+  transition:transform 0.2s var(--spring), opacity 0.2s;
+}
+.mystery-btn:active{ transform:scale(0.88); opacity:0.9; }
+
+/* ---------- Love meter (easter egg) ---------- */
+.love-overlay{
+  position:fixed; inset:0; z-index:200;
+  background:
+    radial-gradient(circle at 20% 15%, rgba(255,255,255,0.25), transparent 35%),
+    radial-gradient(circle at 85% 80%, rgba(255,255,255,0.15), transparent 40%),
+    linear-gradient(160deg, #FF5C82, #FF8FA8 45%, #C9184A);
+  background-size:200% 200%, 200% 200%, 100% 100%;
+  animation:loveDrift 8s ease-in-out infinite;
+  display:flex; align-items:center; justify-content:center; padding:24px;
+}
+@keyframes loveDrift{
+  0%,100%{ background-position:0% 0%, 100% 100%, 0 0; }
+  50%{ background-position:30% 20%, 70% 80%, 0 0; }
+}
+.love-close{
+  position:fixed; top:calc(env(safe-area-inset-top) + 16px); left:16px; z-index:201;
+  width:42px; height:42px; border-radius:50%; background:rgba(255,255,255,0.22);
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  border:1px solid rgba(255,255,255,0.4); color:#fff; display:flex; align-items:center; justify-content:center;
+  transition:transform 0.2s var(--spring);
+}
+.love-close:active{ transform:scale(0.88); }
+.love-content{ width:100%; max-width:340px; text-align:center; position:relative; }
+.love-logo{
+  width:60px; height:60px; margin:0 auto 18px; border-radius:var(--radius-lg);
+  background:rgba(255,255,255,0.2); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  border:1px solid rgba(255,255,255,0.4);
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-display); font-size:28px; font-weight:700; color:#fff;
+  box-shadow:0 12px 32px rgba(0,0,0,0.2); animation:markFloat 3.5s ease-in-out infinite;
+}
+.love-content h1{ color:#fff; font-size:30px; font-weight:700; letter-spacing:-0.02em; text-shadow:0 2px 12px rgba(0,0,0,0.15); }
+.love-sub{ color:rgba(255,255,255,0.88); font-size:13.5px; margin:9px 0 28px; font-weight:500; }
+.love-bar-track{
+  width:100%; height:24px; border-radius:12px; background:rgba(0,0,0,0.24);
+  border:1px solid rgba(255,255,255,0.32); overflow:hidden; margin-bottom:12px;
+  box-shadow:inset 0 2px 6px rgba(0,0,0,0.25);
+}
+.love-bar-fill{
+  height:100%; width:0%; background:linear-gradient(90deg, #FF6B8F, #FFD1DC);
+  transition:width 0.2s var(--ease); border-radius:12px;
+  box-shadow:0 0 16px rgba(255,255,255,0.5);
+}
+.love-count{ color:#fff; font-family:var(--font-mono); font-size:12px; font-weight:700; opacity:0.92; margin-bottom:32px; letter-spacing:0.02em; }
+.love-tap-btn{
+  width:148px; height:148px; border-radius:50%; background:rgba(255,255,255,0.16);
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  border:2px solid rgba(255,255,255,0.45); font-size:58px; -webkit-user-select:none; user-select:none;
+  box-shadow:0 16px 40px rgba(0,0,0,0.25), inset 0 2px 2px rgba(255,255,255,0.3);
+  transition:transform 0.12s var(--spring);
+}
+.love-tap-btn:active{ transform:scale(0.88); }
+
+[hidden]{ display:none !important; }
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <div id="credit">made by kez at 6am</div>
+  <div class="gate-card" id="gateCard">
+    <div class="gate-mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8 17c4-1 6-5 8-9" stroke-dasharray="2 4"/></svg>
+    </div>
+    <h1>Waypoint</h1>
+    <p class="gate-sub">map map map sahur</p>
+    <input id="passInput" type="password" placeholder="Passcode" autocomplete="off" autocapitalize="off" autofocus>
+    <button class="btn-primary" onclick="tryUnlock()">Unlock</button>
+    <p class="gate-error" id="gateError" hidden>Wrong passcode — try again</p>
+  </div>
+  <button class="mystery-btn" onclick="openLoveMeter()" aria-label="???">?</button>
+</div>
+
+<div id="loveOverlay" hidden class="love-overlay">
+  <button class="love-close" onclick="closeLoveMeter()" aria-label="Back">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+  </button>
+  <div class="love-content">
+    <div class="love-logo">?</div>
+    <h1>Love Meter</h1>
+    <p class="love-sub">Fill it up. Resets every day. Good luck.</p>
+    <div class="love-bar-track">
+      <div class="love-bar-fill" id="loveBarFill"></div>
+    </div>
+    <div class="love-count" id="loveCountText">0 / 5,000,000</div>
+    <button class="love-tap-btn" id="loveTapBtn" onclick="tapLove()">❤</button>
+  </div>
+</div>
+
+<div id="accountSetup" hidden class="account-setup">
+  <div class="gate-card">
+    <div class="gate-mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
+    </div>
+    <h1>Who's this?</h1>
+    <p class="gate-sub">Set a name and a colour — used for live location and notes</p>
+    <input id="accountNameInput" class="text-input" type="text" placeholder="Your name" maxlength="20" autocomplete="off">
+    <div class="color-swatch-row" id="colorSwatchRow"></div>
+    <button class="btn-primary" onclick="saveAccount()">Continue</button>
+  </div>
+</div>
+
+<div id="app" hidden>
+  <div id="map"></div>
+
+  <div id="topbar">
+    <div class="brand"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="brand-mark"><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8 17c4-1 6-5 8-9" stroke-dasharray="2 4"/></svg>Waypoint</div>
+    <div style="display:flex; align-items:center; gap:8px; pointer-events:auto;">
+      <button class="icon-btn" id="shareToggle" onclick="toggleSharing()" aria-label="Share my location">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="3"/><path d="M12 21c-4-4-7-7.5-7-11a7 7 0 0 1 14 0c0 3.5-3 7-7 11z"/></svg>
+      </button>
+      <button class="icon-btn" id="satToggle" onclick="toggleBasemap()" aria-label="Toggle satellite view">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      </button>
+      <div class="live-badge"><span class="live-dot" id="liveDot"></span><span id="liveText">Live</span></div>
+    </div>
+  </div>
+
+  <div class="banner" id="hintPoint" hidden>
+    <span><strong>Placing a spot</strong> — tap anywhere on the map</span>
+    <button onclick="setMode(null)">Cancel</button>
+  </div>
+
+  <div class="banner" id="drawBanner" hidden>
+    <span id="drawCount">0 points</span>
+    <div class="draw-banner-actions">
+      <button onclick="undoPoint()">Undo</button>
+      <button class="primary" onclick="finishDrawing()">Finish</button>
+      <button onclick="setMode(null)">Cancel</button>
+    </div>
+  </div>
+
+  <div id="fabBar">
+    <div class="fab-row">
+      <button class="fab" id="fabLocate" onclick="locateMe(false)" aria-label="Locate me">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>
+        <span>Locate</span>
+      </button>
+      <button class="fab" id="fabSpot" onclick="toggleMode('point')" aria-label="Add spot">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        <span>Add Spot</span>
+      </button>
+      <button class="fab" id="fabShortcut" onclick="toggleMode('path')" aria-label="Add shortcut">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8 17c4-1 6-5 8-9" stroke-dasharray="2 4"/></svg>
+        <span>Shortcut</span>
+      </button>
+      <button class="fab" id="fabBorder" onclick="toggleMode('area')" aria-label="Add border">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" stroke-dasharray="3 3"/></svg>
+        <span>Border</span>
+      </button>
+      <button class="fab" id="fabList" onclick="openDrawer()" aria-label="List">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+        <span>List</span>
+      </button>
+      <button class="fab" id="fabNotes" onclick="openNotepad()" aria-label="Shared notes">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
+        <span>Notes</span>
+      </button>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <div class="overlay" id="modalOverlay" hidden>
+    <div class="sheet">
+      <h2 id="modalTitle">Add spot</h2>
+      <div class="chip-row" id="categoryChips"></div>
+      <input id="labelInput" type="text" placeholder="What do you call it?" maxlength="60">
+      <textarea id="notesInput" placeholder="Notes (optional)" maxlength="200"></textarea>
+      <button class="btn-ghost reshape-btn" id="modalReshapeBtn" onclick="startReshape()" hidden>Redraw shape</button>
+      <div class="modal-actions">
+        <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+        <button class="btn-primary" onclick="saveModal()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="confirmOverlay" hidden>
+    <div class="sheet confirm-sheet">
+      <h2>Delete this?</h2>
+      <p>This removes it for everyone with the map.</p>
+      <div class="modal-actions">
+        <button class="btn-ghost" onclick="cancelDelete()">Cancel</button>
+        <button class="btn-danger" onclick="confirmDelete()">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="notepadOverlay" hidden onclick="if(event.target===this) closeNotepad()">
+    <div class="sheet notepad-sheet">
+      <div class="drawer-handle"></div>
+      <div class="notepad-header">
+        <h2>Shared notes <span id="notepadStatus" class="notepad-status">saved</span></h2>
+        <div class="notepad-header-actions">
+          <button class="icon-btn small" onclick="renameActiveTab()" aria-label="Rename tab">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+          </button>
+          <button class="icon-btn small" onclick="deleteActiveTab()" aria-label="Delete tab">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 20 7"/><path d="M6 7v13a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="tab-row" id="notepadTabs"></div>
+      <div id="notepadView" class="notepad-view" onclick="focusNotepadEdit()"></div>
+      <textarea id="notepadText" placeholder="Anything you both want to remember — write it here..." hidden></textarea>
+      <div class="notepad-edited-by" id="notepadEditedBy"></div>
+      <div class="modal-actions">
+        <button class="btn-primary" onclick="closeNotepad()">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="tabNameModalOverlay" hidden>
+    <div class="sheet">
+      <h2 id="tabNameModalTitle">New tab</h2>
+      <input id="tabNameInput" class="text-input" type="text" placeholder="Tab name" maxlength="24">
+      <div class="modal-actions">
+        <button class="btn-ghost" onclick="closeTabNameModal()">Cancel</button>
+        <button class="btn-primary" onclick="saveTabName()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="tabDeleteConfirmOverlay" hidden>
+    <div class="sheet confirm-sheet">
+      <h2>Delete this tab?</h2>
+      <p>Everything written in it will be gone for both of you.</p>
+      <div class="modal-actions">
+        <button class="btn-ghost" onclick="document.getElementById('tabDeleteConfirmOverlay').hidden=true">Cancel</button>
+        <button class="btn-danger" onclick="confirmDeleteTab()">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="drawerOverlay" hidden onclick="if(event.target===this) closeDrawer()">
+    <div class="drawer">
+      <div class="drawer-handle"></div>
+      <div class="drawer-tabs">
+        <button class="drawer-tab active" id="drawerTabMap" onclick="switchDrawerTab('map')">Map <span id="itemCount"></span></button>
+        <button class="drawer-tab" id="drawerTabActivity" onclick="switchDrawerTab('activity')">Activity</button>
+      </div>
+      <input id="searchInput" class="text-input" type="text" placeholder="Search by name..." oninput="renderList()">
+      <div class="sort-row" id="sortRow">
+        <select id="sortSelect" class="sort-select" onchange="renderList()">
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+          <option value="az">A–Z</option>
+          <option value="nearest">Nearest first</option>
+        </select>
+      </div>
+      <div class="chip-row" id="filterChips" style="margin-bottom:4px;"></div>
+      <div class="drawer-list" id="drawerList"></div>
+      <div class="drawer-list" id="activityList" hidden></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/12.15.0/firebase-app-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/12.15.0/firebase-database-compat.min.js"></script>
+<script>
+/* ============ CONFIG ============ */
+// Change this before sharing the link with friends!
+const PASSCODE = "admin67";
+const FALLBACK_CENTER = [52.2698, -8.2680]; // Mitchelstown, Co. Cork — used if geolocation is denied
+
+// Paste your own Firebase project's config here (Firebase console → Project settings → your web app)
+const firebaseConfig = {
+  apiKey: "AIzaSyCjsyEADMSSxkEEaUD_t9XDBxvs7CsOjb8",
+  authDomain: "themap67-9f694.firebaseapp.com",
+  databaseURL: "https://themap67-9f694-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "themap67-9f694"
+};
+firebase.initializeApp(firebaseConfig);
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", function () {
+    navigator.serviceWorker.register("./sw.js").catch(function () {});
+  });
+}
+const itemsRef = firebase.database().ref("items");
+
+const CATEGORIES = {
+  shortcut:     { label: "Shortcut",      color: "#3B9EFF" },
+  possiblepath: { label: "Possible Path", color: "#B98FE0" },
+  escaperoute:  { label: "Escape Route",  color: "#4FC9C4" },
+  spot:         { label: "Spot",          color: "#E8B54D" },
+  togo:         { label: "Place to Go",   color: "#8FD14F" },
+  hazard:       { label: "Hazard",        color: "#E15252" },
+  other:        { label: "Other",         color: "#8B8E96" },
+  hazardzone:   { label: "Hazard",        color: "#E15252" },
+  safezone:     { label: "Safe",          color: "#4FAF6E" },
+  illegalzone:  { label: "Illegal",       color: "#E0932E" }
+};
+const PATH_CATEGORIES = ["shortcut", "possiblepath", "escaperoute"];
+const POINT_CATEGORIES = ["spot", "togo", "hazard", "other"];
+const AREA_CATEGORIES = ["hazardzone", "safezone", "illegalzone"];
+let activeFilters = new Set(Object.keys(CATEGORIES));
+
+/* ============ STATE ============ */
+let map, itemsLayer;
+let mapInitialized = false;
+let items = [];
+let mode = null;               // null | 'point' | 'path'
+let drawingPoints = [];
+let tempDrawLayer = null, tempVertexLayer = null;
+let pendingItem = null;
+let selectedCategory = "spot";
+let editingItemId = null;
+let pendingDeleteId = null;
+let toastTimer = null;
+let layerById = {};
+const ACCOUNT_COLORS = ["#3B9EFF", "#E15252", "#4FAF6E", "#E8B54D", "#B98FE0", "#4FC9C4", "#E0932E", "#FF6FA5"];
+let accountName = localStorage.getItem("waypoint-account-name") || "";
+let accountColor = localStorage.getItem("waypoint-account-color") || "";
+let selectedAccountColor = accountColor || ACCOUNT_COLORS[0];
+let knownItemIds = new Set();
+let myRecentItemIds = new Set();
+let firstItemsSync = true;
+let audioCtx = null;
+let myLastKnownPosition = null;
+
+/* ============ GATE ============ */
+function tryUnlock() {
+  const val = document.getElementById("passInput").value.trim().toLowerCase();
+  if (val && val === PASSCODE.toLowerCase()) {
+    document.getElementById("gate").style.display = "none";
+    if (!accountName || !accountColor) {
+      showAccountSetup();
+    } else {
+      enterApp();
+    }
+  } else {
+    document.getElementById("gateError").hidden = false;
+    document.getElementById("passInput").value = "";
+    document.getElementById("passInput").focus();
+    const card = document.getElementById("gateCard");
+    card.classList.remove("shake");
+    void card.offsetWidth;
+    card.classList.add("shake");
+  }
+}
+document.getElementById("passInput").addEventListener("keydown", function (e) {
+  if (e.key === "Enter") tryUnlock();
+});
+
+function showAccountSetup() {
+  document.getElementById("accountSetup").hidden = false;
+  document.getElementById("accountNameInput").value = accountName;
+  renderColorSwatches();
+  setTimeout(function () { document.getElementById("accountNameInput").focus(); }, 50);
+}
+
+function renderColorSwatches() {
+  const row = document.getElementById("colorSwatchRow");
+  row.innerHTML = "";
+  ACCOUNT_COLORS.forEach(function (c) {
+    const sw = document.createElement("button");
+    sw.type = "button";
+    sw.className = "color-swatch" + (c === selectedAccountColor ? " selected" : "");
+    sw.style.background = c;
+    sw.setAttribute("aria-label", "Pick colour");
+    sw.onclick = function () {
+      selectedAccountColor = c;
+      renderColorSwatches();
+    };
+    row.appendChild(sw);
+  });
+}
+
+function saveAccount() {
+  const name = document.getElementById("accountNameInput").value.trim();
+  if (!name) { showToast("Enter a name first"); return; }
+  accountName = name;
+  accountColor = selectedAccountColor;
+  localStorage.setItem("waypoint-account-name", accountName);
+  localStorage.setItem("waypoint-account-color", accountColor);
+  document.getElementById("accountSetup").hidden = true;
+  enterApp();
+}
+
+function enterApp() {
+  document.getElementById("app").hidden = false;
+  requestAnimationFrame(function () {
+    if (!mapInitialized) { initMap(); mapInitialized = true; }
+    setTimeout(function () { if (map) map.invalidateSize(); }, 300);
+  });
+}
+
+/* ============ LOVE METER (easter egg, works pre-login) ============ */
+const loveRef = firebase.database().ref("lovemeter");
+const LOVE_GOAL = 1000000;
+let loveCount = 0, loveOptimisticExtra = 0, loveFlushTimer = null, loveListenerStarted = false;
+
+function loveTodayKey() {
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+
+function openLoveMeter() {
+  document.getElementById("loveOverlay").hidden = false;
+  if (!loveListenerStarted) {
+    loveListenerStarted = true;
+    loveRef.on("value", function (snap) {
+      const data = snap.val() || {};
+      loveCount = (data.date === loveTodayKey() ? data.count : 0) + loveOptimisticExtra;
+      updateLoveUI();
+    });
+  }
+}
+function closeLoveMeter() { document.getElementById("loveOverlay").hidden = true; }
+
+function tapLove() {
+  loveCount++;
+  loveOptimisticExtra++;
+  updateLoveUI();
+  clearTimeout(loveFlushTimer);
+  loveFlushTimer = setTimeout(flushLove, 500);
+}
+
+function flushLove() {
+  const delta = loveOptimisticExtra;
+  if (delta <= 0) return;
+  loveOptimisticExtra = 0;
+  const key = loveTodayKey();
+  loveRef.transaction(function (current) {
+    const base = current && current.date === key ? current.count : 0;
+    return { date: key, count: base + delta };
+  });
+}
+
+function updateLoveUI() {
+  const pct = Math.min(100, (loveCount / LOVE_GOAL) * 100);
+  document.getElementById("loveBarFill").style.width = pct + "%";
+  document.getElementById("loveCountText").textContent = loveCount.toLocaleString() + " / " + LOVE_GOAL.toLocaleString();
+}
+
+/* ============ MAP ============ */
+let streetLayer, satLayer, satOn = false;
+function initMap() {
+  map = L.map("map", { zoomControl: false, attributionControl: true }).setView(FALLBACK_CENTER, 14);
+  streetLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19
+  });
+  satLayer = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+    attribution: "Tiles &copy; Esri",
+    maxZoom: 19
+  });
+  streetLayer.addTo(map);
+  itemsLayer = L.layerGroup().addTo(map);
+  map.on("click", onMapClick);
+
+  locateMe(true);
+  startSync();
+  startPresenceListener();
+  if (localStorage.getItem("waypoint-was-sharing") === "1" && accountName) {
+    startSharing();
+  }
+
+  setTimeout(function () {
+    showToast("Tap Add Spot or Shortcut, then tap the map");
+  }, 1000);
+}
+
+function toggleBasemap() {
+  satOn = !satOn;
+  if (satOn) {
+    map.removeLayer(streetLayer);
+    satLayer.addTo(map);
+  } else {
+    map.removeLayer(satLayer);
+    streetLayer.addTo(map);
+  }
+  document.getElementById("satToggle").classList.toggle("active", satOn);
+}
+
+function locateMe(silent) {
+  if (!navigator.geolocation) { if (!silent) showToast("Location not available on this device"); return; }
+  navigator.geolocation.getCurrentPosition(
+    function (pos) {
+      myLastKnownPosition = [pos.coords.latitude, pos.coords.longitude];
+      map.setView(myLastKnownPosition, 15);
+      renderItems();
+      if (drawerTab !== "activity") renderList();
+    },
+    function () { if (!silent) showToast("Couldn't get your location"); },
+    { timeout: 8000 }
+  );
+}
+
+/* ============ LIVE PRESENCE (blue dots for you + friends) ============ */
+let deviceId = localStorage.getItem("waypoint-device-id");
+if (!deviceId) {
+  deviceId = "d" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  localStorage.setItem("waypoint-device-id", deviceId);
+}
+const presenceRef = firebase.database().ref("presence");
+let presenceLayer, sharingLocation = false, watchId = null, lastPresenceWrite = 0, presenceTicker = null;
+const STALE_MS = 3 * 60 * 1000;
+
+function toggleSharing() {
+  if (sharingLocation) { stopSharing(); } else { startSharing(); }
+}
+
+function startSharing() {
+  if (!navigator.geolocation) { showToast("Location not available on this device"); return; }
+  sharingLocation = true;
+  document.getElementById("shareToggle").classList.add("active");
+  localStorage.setItem("waypoint-was-sharing", "1");
+  const myRef = presenceRef.child(deviceId);
+  myRef.onDisconnect().remove();
+  watchId = navigator.geolocation.watchPosition(function (pos) {
+    myLastKnownPosition = [pos.coords.latitude, pos.coords.longitude];
+    const now = Date.now();
+    if (now - lastPresenceWrite < 8000) return;
+    lastPresenceWrite = now;
+    myRef.set({ name: accountName, color: accountColor, lat: pos.coords.latitude, lng: pos.coords.longitude, updatedAt: now });
+  }, function () {
+    showToast("Couldn't get your location");
+    stopSharing();
+  }, { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 });
+  showToast("Sharing your location");
+}
+
+function stopSharing() {
+  sharingLocation = false;
+  document.getElementById("shareToggle").classList.remove("active");
+  localStorage.setItem("waypoint-was-sharing", "0");
+  if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+  presenceRef.child(deviceId).remove();
+  showToast("Stopped sharing");
+}
+
+function startPresenceListener() {
+  presenceLayer = L.layerGroup().addTo(map);
+  presenceRef.on("value", function (snap) { renderPresence(snap.val() || {}); });
+  presenceTicker = setInterval(function () {
+    presenceRef.once("value").then(function (snap) { renderPresence(snap.val() || {}); });
+  }, 30000);
+}
+
+function renderPresence(data) {
+  presenceLayer.clearLayers();
+  const now = Date.now();
+  Object.keys(data).forEach(function (id) {
+    const p = data[id];
+    if (!p || typeof p.lat !== "number" || now - (p.updatedAt || 0) > STALE_MS) return;
+    const label = id === deviceId ? "You" : (p.name || "Friend");
+    const dotColor = p.color || "#4FA8F0";
+    const icon = L.divIcon({
+      className: "",
+      html: '<div class="friend-dot" style="--dot-color:' + dotColor + '"></div><div class="friend-label">' + escapeHTML(label) + "</div>",
+      iconSize: [16, 16], iconAnchor: [8, 8]
+    });
+    L.marker([p.lat, p.lng], { icon: icon, zIndexOffset: 1000, interactive: false }).addTo(presenceLayer);
+  });
+}
+
+/* ============ SHARED NOTEPAD (tabs) ============ */
+const notepadTabsRef = firebase.database().ref("notepad/tabs");
+let notepadTabs = {};
+let activeTabId = null;
+let notepadFocused = false, notepadSaveTimer = null, notepadListenerStarted = false, migrationAttempted = false;
+let tabNameMode = "create";
+
+function openNotepad() {
+  document.getElementById("notepadOverlay").hidden = false;
+  document.getElementById("notepadText").hidden = true;
+  document.getElementById("notepadView").hidden = false;
+  setNotepadStatus("saved");
+  if (!notepadListenerStarted) {
+    notepadListenerStarted = true;
+    notepadTabsRef.on("value", function (snap) {
+      notepadTabs = snap.val() || {};
+      if (Object.keys(notepadTabs).length === 0) {
+        if (!migrationAttempted) { migrationAttempted = true; migrateOldNoteOrCreateDefault(); }
+        return;
+      }
+      renderNotepadTabs();
+    });
+  } else {
+    renderNotepadTabs();
+  }
+}
+
+function migrateOldNoteOrCreateDefault() {
+  firebase.database().ref("notepad/text").once("value").then(function (snap) {
+    const oldText = snap.val() || "";
+    const id = "t" + Date.now().toString(36);
+    notepadTabsRef.child(id).set({
+      name: "Notes", text: oldText,
+      segments: oldText ? [{ text: oldText, color: null }] : [],
+      createdAt: Date.now(), createdBy: { name: accountName, color: accountColor }
+    });
+  });
+}
+
+function closeNotepad() {
+  document.getElementById("notepadText").blur();
+  notepadFocused = false;
+  document.getElementById("notepadText").hidden = true;
+  document.getElementById("notepadView").hidden = false;
+  document.getElementById("notepadOverlay").hidden = true;
+  loadActiveTabText();
+}
+
+function setNotepadStatus(state) {
+  const el = document.getElementById("notepadStatus");
+  el.textContent = state;
+  el.classList.toggle("syncing", state === "saving…");
+}
+
+function renderNotepadTabs() {
+  const row = document.getElementById("notepadTabs");
+  const ids = Object.keys(notepadTabs).sort(function (a, b) {
+    return (notepadTabs[a].createdAt || 0) - (notepadTabs[b].createdAt || 0);
+  });
+  if (!activeTabId || !notepadTabs[activeTabId]) activeTabId = ids[0];
+  row.innerHTML = "";
+  ids.forEach(function (id) {
+    const tab = notepadTabs[id];
+    const color = (tab.createdBy && tab.createdBy.color) || "#8B8E96";
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "tab-chip" + (id === activeTabId ? " active" : "");
+    chip.style.setProperty("--tab-color", color);
+    chip.innerHTML = '<span class="tab-chip-dot" style="background:' + color + '"></span>' + escapeHTML(tab.name || "Untitled");
+    chip.onclick = function () { activeTabId = id; renderNotepadTabs(); };
+    row.appendChild(chip);
+  });
+  const addBtn = document.createElement("button");
+  addBtn.type = "button";
+  addBtn.className = "tab-chip tab-add";
+  addBtn.textContent = "+";
+  addBtn.onclick = function () { openTabNameModal("create"); };
+  row.appendChild(addBtn);
+  loadActiveTabText();
+}
+
+/* Returns this tab's text as {text,color} runs, converting older lineColors-format
+   data (or plain text with no attribution at all) into the same shape on the fly. */
+function tabSegments(tab) {
+  if (!tab) return [];
+  if (tab.segments && tab.segments.length) return tab.segments;
+  if (tab.lineColors && tab.lineColors.length) {
+    const lines = (tab.text || "").split("\n");
+    return lines.map(function (line, i) {
+      return { text: line + (i < lines.length - 1 ? "\n" : ""), color: tab.lineColors[i] || null };
+    });
+  }
+  if (tab.text) return [{ text: tab.text, color: null }];
+  return [];
+}
+
+function sliceSegments(segments, start, end) {
+  const result = [];
+  let pos = 0;
+  for (let i = 0; i < segments.length; i++) {
+    const segLen = segments[i].text.length;
+    const segStart = pos, segEnd = pos + segLen;
+    const overlapStart = Math.max(start, segStart);
+    const overlapEnd = Math.min(end, segEnd);
+    if (overlapStart < overlapEnd) {
+      result.push({ text: segments[i].text.slice(overlapStart - segStart, overlapEnd - segStart), color: segments[i].color });
+    }
+    pos = segEnd;
+  }
+  return result;
+}
+
+/* Only the part of the text that actually changed (found via common prefix/suffix)
+   gets the current author's color — everything before and after that keeps
+   whichever color it already had. This is what keeps a friend's writing their
+   color even when you add text right next to it. */
+function diffSegments(oldSegments, newText, authorColor) {
+  const oldText = oldSegments.map(function (s) { return s.text; }).join("");
+  let prefixLen = 0;
+  const maxPrefix = Math.min(oldText.length, newText.length);
+  while (prefixLen < maxPrefix && oldText[prefixLen] === newText[prefixLen]) prefixLen++;
+  let suffixLen = 0;
+  const maxSuffix = Math.min(oldText.length, newText.length) - prefixLen;
+  while (suffixLen < maxSuffix && oldText[oldText.length - 1 - suffixLen] === newText[newText.length - 1 - suffixLen]) suffixLen++;
+
+  const middleText = newText.slice(prefixLen, newText.length - suffixLen);
+  const prefixSegs = sliceSegments(oldSegments, 0, prefixLen);
+  const suffixSegs = sliceSegments(oldSegments, oldText.length - suffixLen, oldText.length);
+
+  const result = prefixSegs.slice();
+  if (middleText.length > 0) {
+    if (result.length && result[result.length - 1].color === authorColor) {
+      result[result.length - 1] = { text: result[result.length - 1].text + middleText, color: authorColor };
+    } else {
+      result.push({ text: middleText, color: authorColor });
+    }
+  }
+  suffixSegs.forEach(function (seg) {
+    if (result.length && result[result.length - 1].color === seg.color) {
+      result[result.length - 1] = { text: result[result.length - 1].text + seg.text, color: seg.color };
+    } else {
+      result.push(seg);
+    }
+  });
+  return result.filter(function (s) { return s.text.length > 0; });
+}
+
+function renderNotepadView(tab, text) {
+  const view = document.getElementById("notepadView");
+  if (!text) {
+    view.classList.add("empty");
+    view.textContent = document.getElementById("notepadText").placeholder;
+    return;
+  }
+  view.classList.remove("empty");
+  const segments = tabSegments(tab);
+  view.innerHTML = segments.map(function (seg) {
+    const style = seg.color ? ' style="color:' + seg.color + '"' : "";
+    return "<span" + style + ">" + escapeHTML(seg.text) + "</span>";
+  }).join("");
+}
+
+function focusNotepadEdit() {
+  const tab = notepadTabs[activeTabId];
+  if (!tab) return;
+  const textEl = document.getElementById("notepadText");
+  textEl.value = tab.text || "";
+  document.getElementById("notepadView").hidden = true;
+  textEl.hidden = false;
+  textEl.focus();
+  textEl.selectionStart = textEl.selectionEnd = textEl.value.length;
+}
+
+function loadActiveTabText() {
+  if (notepadFocused) return;
+  const tab = notepadTabs[activeTabId];
+  const val = tab ? (tab.text || "") : "";
+  const el = document.getElementById("notepadText");
+  if (el.value !== val) el.value = val;
+  renderNotepadView(tab, val);
+  const badge = document.getElementById("notepadEditedBy");
+  if (tab && tab.lastEditedBy && tab.lastEditedBy.name) {
+    badge.innerHTML = '<span class="edited-dot" style="background:' + (tab.lastEditedBy.color || "#8B8E96") + '"></span>Last edited by ' + escapeHTML(tab.lastEditedBy.name);
+  } else {
+    badge.innerHTML = "";
+  }
+}
+
+function openTabNameModal(mode) {
+  tabNameMode = mode;
+  document.getElementById("tabNameModalTitle").textContent = mode === "create" ? "New tab" : "Rename tab";
+  document.getElementById("tabNameInput").value = mode === "rename" && notepadTabs[activeTabId] ? notepadTabs[activeTabId].name : "";
+  document.getElementById("tabNameModalOverlay").hidden = false;
+  setTimeout(function () { document.getElementById("tabNameInput").focus(); }, 50);
+}
+function closeTabNameModal() { document.getElementById("tabNameModalOverlay").hidden = true; }
+
+function saveTabName() {
+  const val = document.getElementById("tabNameInput").value.trim();
+  if (!val) { showToast("Enter a name first"); return; }
+  if (tabNameMode === "create") {
+    const id = "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+    notepadTabsRef.child(id).set({ name: val, text: "", createdAt: Date.now(), createdBy: { name: accountName, color: accountColor } });
+    activeTabId = id;
+  } else if (activeTabId) {
+    notepadTabsRef.child(activeTabId).child("name").set(val);
+  }
+  closeTabNameModal();
+}
+
+function renameActiveTab() {
+  if (!activeTabId) return;
+  openTabNameModal("rename");
+}
+
+function deleteActiveTab() {
+  if (!activeTabId) return;
+  if (Object.keys(notepadTabs).length <= 1) { showToast("You need at least one tab"); return; }
+  document.getElementById("tabDeleteConfirmOverlay").hidden = false;
+}
+function confirmDeleteTab() {
+  document.getElementById("tabDeleteConfirmOverlay").hidden = true;
+  notepadTabsRef.child(activeTabId).remove();
+  activeTabId = null;
+}
+
+document.getElementById("notepadText").addEventListener("focus", function () { notepadFocused = true; });
+document.getElementById("notepadText").addEventListener("blur", function () {
+  notepadFocused = false;
+  document.getElementById("notepadText").hidden = true;
+  document.getElementById("notepadView").hidden = false;
+  loadActiveTabText();
+});
+document.getElementById("notepadText").addEventListener("input", function (e) {
+  if (!activeTabId) return;
+  setNotepadStatus("saving…");
+  clearTimeout(notepadSaveTimer);
+  const val = e.target.value;
+  const id = activeTabId;
+  const baseline = notepadTabs[id] || {};
+  const oldSegments = tabSegments(baseline);
+  notepadSaveTimer = setTimeout(function () {
+    const authorColor = accountColor || "#4FA3FF";
+    const newSegments = diffSegments(oldSegments, val, authorColor);
+    notepadTabsRef.child(id).update({
+      text: val,
+      segments: newSegments,
+      lastEditedBy: { name: accountName, color: authorColor },
+      lastEditedAt: Date.now()
+    }).then(function () { setNotepadStatus("saved"); }).catch(function () { setNotepadStatus("couldn't save"); });
+  }, 900);
+});
+
+/* ============ SYNC (Firebase Realtime Database) ============ */
+function setLiveStatus(online) {
+  document.getElementById("liveDot").classList.toggle("offline", !online);
+  document.getElementById("liveText").textContent = online ? "Live" : "Offline";
+}
+
+function startSync() {
+  itemsRef.on("value", function (snapshot) {
+    const val = snapshot.val();
+    items = val ? Object.keys(val).map(function (k) { return val[k]; }) : [];
+
+    if (!firstItemsSync) {
+      items.forEach(function (item) {
+        if (!knownItemIds.has(item.id) && !myRecentItemIds.has(item.id)) {
+          notifyNewItem(item);
+        }
+      });
+    }
+    firstItemsSync = false;
+    knownItemIds = new Set(items.map(function (i) { return i.id; }));
+
+    renderItems();
+    if (drawerTab === "activity") { renderActivity(); } else { renderList(); }
+    setLiveStatus(true);
+  }, function () {
+    setLiveStatus(false);
+    showToast("Sync error — check your Firebase config");
+  });
+  firebase.database().ref(".info/connected").on("value", function (snap) {
+    setLiveStatus(snap.val() === true);
+  });
+}
+
+function notifyNewItem(item) {
+  const who = item.addedBy && item.addedBy.name ? item.addedBy.name : "Someone";
+  showToast(who + ' added "' + item.label + '"');
+  playNotifySound();
+}
+
+function playNotifySound() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = audioCtx;
+    const now = ctx.currentTime;
+    [660, 880].forEach(function (freq, i) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, now + i * 0.09);
+      gain.gain.linearRampToValueAtTime(0.15, now + i * 0.09 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.09 + 0.25);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + i * 0.09);
+      osc.stop(now + i * 0.09 + 0.3);
+    });
+  } catch (e) {}
+}
+
+async function saveItem(item) {
+  try {
+    await itemsRef.child(item.id).set(item);
+  } catch (e) {
+    showToast("Couldn't save — check your connection");
+  }
+}
+
+async function removeItem(id) {
+  try {
+    await itemsRef.child(id).remove();
+  } catch (e) {
+    showToast("Couldn't delete — check your connection");
+  }
+}
+
+/* ============ RENDER MAP ITEMS ============ */
+function renderItems() {
+  itemsLayer.clearLayers();
+  layerById = {};
+  items.forEach(function (item) {
+    if (!activeFilters.has(item.category)) return;
+    const cat = CATEGORIES[item.category] || CATEGORIES.other;
+    let layer;
+    if (item.type === "point") {
+      layer = L.circleMarker(item.coords, { radius: 9, color: "#0B0C10", weight: 2, fillColor: cat.color, fillOpacity: 0.95 });
+    } else if (item.type === "area") {
+      layer = L.polygon(item.coords, { color: cat.color, weight: 2, fillColor: cat.color, fillOpacity: 0.22 });
+    } else {
+      layer = L.polyline(item.coords, { color: cat.color, weight: 4, dashArray: "6 6", opacity: 0.9, lineCap: "round" });
+    }
+    layer.bindPopup(popupHTML(item));
+    layer.addTo(itemsLayer);
+    layerById[item.id] = layer;
+  });
+}
+
+function pathLength(coords) {
+  let d = 0;
+  for (let i = 0; i < coords.length - 1; i++) {
+    d += L.latLng(coords[i]).distanceTo(L.latLng(coords[i + 1]));
+  }
+  return d;
+}
+function formatDistance(m) {
+  if (m < 1000) return Math.round(m) + " m";
+  return (m / 1000).toFixed(m < 10000 ? 2 : 1) + " km";
+}
+function polygonArea(coords) {
+  const R = 6378137;
+  let area = 0;
+  const n = coords.length;
+  for (let i = 0; i < n; i++) {
+    const p1 = coords[i], p2 = coords[(i + 1) % n];
+    area += (p2[1] * Math.PI / 180 - p1[1] * Math.PI / 180) * (2 + Math.sin(p1[0] * Math.PI / 180) + Math.sin(p2[0] * Math.PI / 180));
+  }
+  return Math.abs(area * R * R / 2);
+}
+function formatArea(m2) {
+  if (m2 < 10000) return Math.round(m2).toLocaleString() + " m\u00B2";
+  return (m2 / 10000).toFixed(2) + " ha";
+}
+function measureText(item) {
+  if (item.type === "path") return formatDistance(pathLength(item.coords));
+  if (item.type === "area") return formatArea(polygonArea(item.coords));
+  if (item.type === "point" && myLastKnownPosition) {
+    return formatDistance(L.latLng(myLastKnownPosition).distanceTo(L.latLng(item.coords))) + " away";
+  }
+  return "";
+}
+
+function popupHTML(item) {
+  const cat = CATEGORIES[item.category] || CATEGORIES.other;
+  const measure = measureText(item);
+  const addedByHTML = item.addedBy && item.addedBy.name
+    ? '<div class="popup-addedby"><span class="edited-dot" style="background:' + (item.addedBy.color || "#8B8E96") + '"></span>Added by ' + escapeHTML(item.addedBy.name) + "</div>"
+    : "";
+  return '<div class="popup" style="border-left:3px solid ' + cat.color + '">' +
+    '<div class="popup-cat" style="color:' + cat.color + '">' + cat.label.toUpperCase() + "</div>" +
+    '<div class="popup-label">' + escapeHTML(item.label) + "</div>" +
+    (measure ? '<div class="popup-measure">' + measure + "</div>" : "") +
+    (item.notes ? '<div class="popup-notes">' + escapeHTML(item.notes) + "</div>" : "") +
+    addedByHTML +
+    '<div class="popup-actions">' +
+    '<button class="popup-edit" onclick="startEditItem(\'' + item.id + '\')">Edit</button>' +
+    '<button class="popup-delete" onclick="askDelete(\'' + item.id + '\')">Delete</button>' +
+    "</div></div>";
+}
+
+function escapeHTML(s) {
+  const d = document.createElement("div");
+  d.textContent = s == null ? "" : s;
+  return d.innerHTML;
+}
+
+/* ============ ADD FLOW ============ */
+function toggleMode(m) { setMode(mode === m ? null : m); }
+
+function setMode(m) {
+  mode = m;
+  drawingPoints = [];
+  clearTempLine();
+  updateModeUI();
+}
+
+function updateModeUI() {
+  document.getElementById("fabSpot").classList.toggle("active", mode === "point");
+  document.getElementById("fabShortcut").classList.toggle("active", mode === "path");
+  document.getElementById("fabBorder").classList.toggle("active", mode === "area");
+  document.getElementById("hintPoint").hidden = mode !== "point";
+  document.getElementById("drawBanner").hidden = !(mode === "path" || mode === "area");
+  if (mode === "path" || mode === "area") {
+    const n = drawingPoints.length;
+    let extra = "";
+    if (mode === "path" && n > 1) extra = " \u00B7 " + formatDistance(pathLength(drawingPoints));
+    if (mode === "area" && n > 2) extra = " \u00B7 " + formatArea(polygonArea(drawingPoints));
+    document.getElementById("drawCount").textContent = n + (n === 1 ? " point" : " points") + extra;
+  }
+}
+
+function onMapClick(e) {
+  if (mode === "point") {
+    const partial = { type: "point", coords: [e.latlng.lat, e.latlng.lng] };
+    if (editingItemId) { partial.editId = editingItemId; editingItemId = null; }
+    openItemModal(partial);
+    setMode(null);
+  } else if (mode === "path" || mode === "area") {
+    drawingPoints.push([e.latlng.lat, e.latlng.lng]);
+    updateTempLine();
+    updateModeUI();
+  }
+}
+
+function updateTempLine() {
+  clearTempLine();
+  const DRAW_COLOR = mode === "area" ? "#B98FE0" : "#3B9EFF";
+  if (drawingPoints.length > 1) {
+    tempDrawLayer = L.polyline(drawingPoints, { color: DRAW_COLOR, weight: 4, dashArray: "2 8", opacity: 0.9 }).addTo(map);
+  }
+  if (drawingPoints.length > 0) {
+    tempVertexLayer = L.layerGroup(drawingPoints.map(function (pt) {
+      return L.circleMarker(pt, { radius: 5, color: "#fff", weight: 2, fillColor: DRAW_COLOR, fillOpacity: 1 });
+    })).addTo(map);
+  }
+}
+
+function clearTempLine() {
+  if (tempDrawLayer) { map.removeLayer(tempDrawLayer); tempDrawLayer = null; }
+  if (tempVertexLayer) { map.removeLayer(tempVertexLayer); tempVertexLayer = null; }
+}
+
+function undoPoint() {
+  drawingPoints.pop();
+  updateTempLine();
+  updateModeUI();
+}
+
+function finishDrawing() {
+  if (mode === "area") { finishArea(); } else { finishPath(); }
+}
+
+function finishPath() {
+  if (drawingPoints.length < 2) { showToast("Add at least 2 points first"); return; }
+  const partial = { type: "path", coords: drawingPoints.slice() };
+  if (editingItemId) { partial.editId = editingItemId; editingItemId = null; }
+  openItemModal(partial);
+  setMode(null);
+}
+
+function finishArea() {
+  if (drawingPoints.length < 3) { showToast("Add at least 3 points first"); return; }
+  const partial = { type: "area", coords: drawingPoints.slice() };
+  if (editingItemId) { partial.editId = editingItemId; editingItemId = null; }
+  openItemModal(partial);
+  setMode(null);
+}
+
+function startEditItem(id) {
+  const item = items.find(function (i) { return i.id === id; });
+  if (!item) return;
+  map.closePopup();
+  openItemModal({ type: item.type, coords: item.coords, editId: id });
+}
+
+/* ============ MODAL ============ */
+function openItemModal(partial) {
+  pendingItem = partial;
+  const existing = partial.editId ? items.find(function (i) { return i.id === partial.editId; }) : null;
+  const titles = {
+    point: existing ? "Edit spot" : "Name this spot",
+    path: existing ? "Edit route" : "Name this route",
+    area: existing ? "Edit border" : "Name this border"
+  };
+  document.getElementById("modalTitle").textContent = titles[partial.type] || "Name this";
+  document.getElementById("labelInput").value = existing ? existing.label : "";
+  document.getElementById("notesInput").value = existing ? (existing.notes || "") : "";
+
+  const chipRow = document.getElementById("categoryChips");
+  chipRow.innerHTML = "";
+  const catsByType = { point: POINT_CATEGORIES, path: PATH_CATEGORIES, area: AREA_CATEGORIES };
+  const cats = catsByType[partial.type] || POINT_CATEGORIES;
+  chipRow.hidden = false;
+  selectedCategory = (existing && cats.indexOf(existing.category) !== -1) ? existing.category : cats[0];
+  cats.forEach(function (key) {
+    const cat = CATEGORIES[key];
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "chip" + (key === selectedCategory ? " active" : "");
+    chip.style.setProperty("--chip-color", cat.color);
+    chip.textContent = cat.label;
+    chip.onclick = function () {
+      selectedCategory = key;
+      Array.prototype.forEach.call(chipRow.children, function (c) { c.classList.remove("active"); });
+      chip.classList.add("active");
+    };
+    chipRow.appendChild(chip);
+  });
+
+  const reshapeBtn = document.getElementById("modalReshapeBtn");
+  reshapeBtn.hidden = !existing;
+  reshapeBtn.textContent = partial.type === "point" ? "Move this spot" : "Redraw shape";
+
+  document.getElementById("modalOverlay").hidden = false;
+  setTimeout(function () { document.getElementById("labelInput").focus(); }, 50);
+}
+
+function startReshape() {
+  if (!pendingItem || !pendingItem.editId) return;
+  const id = pendingItem.editId;
+  const type = pendingItem.type;
+  closeModal();
+  closeDrawer();
+  editingItemId = id;
+  mode = type;
+  drawingPoints = [];
+  updateModeUI();
+  showToast(type === "point" ? "Tap the map for the new spot" : "Redraw the shape, then tap Finish");
+}
+
+function closeModal() {
+  document.getElementById("modalOverlay").hidden = true;
+  pendingItem = null;
+}
+
+async function saveModal() {
+  const label = document.getElementById("labelInput").value.trim();
+  if (!label) { showToast("Add a name first"); return; }
+  const notes = document.getElementById("notesInput").value.trim();
+
+  if (pendingItem.editId) {
+    const existing = items.find(function (i) { return i.id === pendingItem.editId; });
+    const item = {
+      id: pendingItem.editId,
+      type: pendingItem.type,
+      category: selectedCategory,
+      label: label,
+      notes: notes,
+      coords: pendingItem.coords,
+      addedBy: (existing && existing.addedBy) || { name: accountName, color: accountColor },
+      addedAt: (existing && existing.addedAt) || Date.now(),
+      editedBy: { name: accountName, color: accountColor },
+      editedAt: Date.now()
+    };
+    myRecentItemIds.add(item.id);
+    closeModal();
+    showToast("Updated");
+    await saveItem(item);
+    return;
+  }
+
+  const item = {
+    id: "w" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+    type: pendingItem.type,
+    category: selectedCategory,
+    label: label,
+    notes: notes,
+    coords: pendingItem.coords,
+    addedBy: { name: accountName, color: accountColor },
+    addedAt: Date.now()
+  };
+  myRecentItemIds.add(item.id);
+  closeModal();
+  showToast("Saved");
+  await saveItem(item);
+}
+
+/* ============ DELETE ============ */
+function askDelete(id) {
+  pendingDeleteId = id;
+  document.getElementById("confirmOverlay").hidden = false;
+}
+function cancelDelete() {
+  pendingDeleteId = null;
+  document.getElementById("confirmOverlay").hidden = true;
+}
+async function confirmDelete() {
+  if (!pendingDeleteId) return;
+  const id = pendingDeleteId;
+  document.getElementById("confirmOverlay").hidden = true;
+  pendingDeleteId = null;
+  map.closePopup();
+  await removeItem(id);
+}
+
+/* ============ DRAWER / LIST ============ */
+let drawerTab = "map";
+function openDrawer() {
+  document.getElementById("drawerOverlay").hidden = false;
+  if (drawerTab === "activity") { renderActivity(); } else { renderList(); }
+}
+function closeDrawer() { document.getElementById("drawerOverlay").hidden = true; }
+
+function switchDrawerTab(tab) {
+  drawerTab = tab;
+  document.getElementById("drawerTabMap").classList.toggle("active", tab === "map");
+  document.getElementById("drawerTabActivity").classList.toggle("active", tab === "activity");
+  document.getElementById("searchInput").hidden = tab !== "map";
+  document.getElementById("sortRow").hidden = tab !== "map";
+  document.getElementById("filterChips").hidden = tab !== "map";
+  document.getElementById("drawerList").hidden = tab !== "map";
+  document.getElementById("activityList").hidden = tab !== "activity";
+  if (tab === "activity") { renderActivity(); } else { renderList(); }
+}
+
+function relativeTime(ts) {
+  if (!ts) return "";
+  const min = Math.floor((Date.now() - ts) / 60000);
+  if (min < 1) return "just now";
+  if (min < 60) return min + "m ago";
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return hr + "h ago";
+  const day = Math.floor(hr / 24);
+  if (day < 30) return day + "d ago";
+  return Math.floor(day / 30) + "mo ago";
+}
+
+function renderActivity() {
+  const list = document.getElementById("activityList");
+  if (!items.length) {
+    list.innerHTML = '<p class="empty">No activity yet.</p>';
+    return;
+  }
+  const verbs = { point: "marked", path: "drew", area: "marked out" };
+  const sorted = items.slice().sort(function (a, b) { return (b.addedAt || 0) - (a.addedAt || 0); });
+  list.innerHTML = sorted.map(function (item) {
+    const cat = CATEGORIES[item.category] || CATEGORIES.other;
+    const who = item.addedBy && item.addedBy.name ? item.addedBy.name : "Someone";
+    const color = item.addedBy && item.addedBy.color ? item.addedBy.color : "#8B8E96";
+    const noun = item.type === "area" ? cat.label + " border" : cat.label;
+    const verb = verbs[item.type] || "added";
+    return '<div class="activity-row" onclick="flyTo(\'' + item.id + '\')">' +
+      '<span class="dot" style="background:' + color + '"></span>' +
+      '<div class="activity-text">' +
+      '<span class="activity-who">' + escapeHTML(who) + "</span> " + verb + " a " + noun + ' "' + escapeHTML(item.label) + '"' +
+      '<div class="activity-time">' + relativeTime(item.addedAt) + "</div>" +
+      "</div></div>";
+  }).join("");
+}
+
+function renderFilterChips() {
+  const row = document.getElementById("filterChips");
+  row.innerHTML = "";
+  Object.keys(CATEGORIES).forEach(function (key) {
+    const cat = CATEGORIES[key];
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "chip" + (activeFilters.has(key) ? " active" : "");
+    chip.style.setProperty("--chip-color", cat.color);
+    chip.style.opacity = activeFilters.has(key) ? "1" : "0.5";
+    chip.textContent = cat.label;
+    chip.onclick = function () {
+      if (activeFilters.has(key)) activeFilters.delete(key); else activeFilters.add(key);
+      renderFilterChips();
+      renderItems();
+      renderList();
+    };
+    row.appendChild(chip);
+  });
+}
+
+function itemDistanceFromMe(item) {
+  if (!myLastKnownPosition) return Infinity;
+  const ref = item.type === "point" ? item.coords : item.coords[0];
+  return L.latLng(myLastKnownPosition).distanceTo(L.latLng(ref));
+}
+
+function renderList() {
+  renderFilterChips();
+  const list = document.getElementById("drawerList");
+  const query = (document.getElementById("searchInput").value || "").trim().toLowerCase();
+  let visible = items.filter(function (i) { return activeFilters.has(i.category); });
+  if (query) {
+    visible = visible.filter(function (i) { return (i.label || "").toLowerCase().indexOf(query) === 0; });
+  }
+  document.getElementById("itemCount").textContent = visible.length ? "(" + visible.length + ")" : "";
+  if (!visible.length) {
+    const msg = query ? "No matches for \u201c" + escapeHTML(query) + "\u201d."
+      : (items.length ? "Nothing matches the current filters." : "Nothing on the map yet — add a spot or shortcut to get started.");
+    list.innerHTML = '<p class="empty">' + msg + "</p>";
+    return;
+  }
+  const sortMode = document.getElementById("sortSelect").value;
+  const sorted = visible.slice().sort(function (a, b) {
+    if (sortMode === "oldest") return (a.addedAt || 0) - (b.addedAt || 0);
+    if (sortMode === "az") return (a.label || "").localeCompare(b.label || "");
+    if (sortMode === "nearest") return itemDistanceFromMe(a) - itemDistanceFromMe(b);
+    return (b.addedAt || 0) - (a.addedAt || 0);
+  });
+  list.innerHTML = sorted.map(function (item) {
+    const cat = CATEGORIES[item.category] || CATEGORIES.other;
+    const measure = measureText(item);
+    return '<div class="list-row" onclick="flyTo(\'' + item.id + '\')">' +
+      '<span class="dot" style="background:' + cat.color + '"></span>' +
+      '<div class="list-row-text">' +
+      '<div class="list-row-label">' + escapeHTML(item.label) + "</div>" +
+      '<div class="list-row-cat">' + cat.label + (measure ? " \u00B7 " + measure : "") + "</div>" +
+      "</div>" +
+      '<button class="icon-btn small" onclick="event.stopPropagation(); askDelete(\'' + item.id + '\')" aria-label="Delete">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 20 7"/><path d="M6 7v13a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg>' +
+      "</button></div>";
+  }).join("");
+}
+
+function flyTo(id) {
+  const item = items.find(function (i) { return i.id === id; });
+  if (!item) return;
+  closeDrawer();
+  if (item.type === "point") {
+    map.flyTo(item.coords, 17);
+  } else {
+    map.flyToBounds(L.latLngBounds(item.coords), { padding: [60, 60] });
+  }
+  const layer = layerById[id];
+  if (layer) setTimeout(function () { layer.openPopup(); }, 450);
+}
+
+/* ============ TOAST ============ */
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2400);
+}
+
+/* ============ FAB REORDER (long-press and drag) ============ */
+(function setupFabReorder() {
+  const row = document.querySelector(".fab-row");
+  if (!row) return;
+
+  const savedOrder = JSON.parse(localStorage.getItem("waypoint-fab-order") || "null");
+  if (savedOrder) {
+    savedOrder.forEach(function (id) {
+      const el = document.getElementById(id);
+      if (el) row.appendChild(el);
+    });
+  }
+
+  function saveOrder() {
+    const ids = Array.prototype.map.call(row.children, function (el) { return el.id; }).filter(Boolean);
+    localStorage.setItem("waypoint-fab-order", JSON.stringify(ids));
+  }
+
+  let dragEl = null, dragging = false, longPressTimer = null, justDragged = false;
+  let startX = 0, startY = 0;
+
+  Array.prototype.forEach.call(row.querySelectorAll(".fab"), function (btn) {
+    btn.addEventListener("touchstart", function (e) {
+      const t = e.touches[0];
+      startX = t.clientX; startY = t.clientY;
+      longPressTimer = setTimeout(function () {
+        dragging = true;
+        dragEl = btn;
+        btn.classList.add("dragging");
+        if (navigator.vibrate) navigator.vibrate(15);
+      }, 380);
+    }, { passive: true });
+
+    btn.addEventListener("touchmove", function (e) {
+      const t = e.touches[0];
+      const moved = Math.abs(t.clientX - startX) > 10 || Math.abs(t.clientY - startY) > 10;
+      if (!dragging && longPressTimer && moved) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+        return;
+      }
+      if (!dragging || dragEl !== btn) return;
+      e.preventDefault();
+      const x = t.clientX;
+      const siblings = Array.prototype.filter.call(row.children, function (el) { return el !== dragEl; });
+      for (let i = 0; i < siblings.length; i++) {
+        const rect = siblings[i].getBoundingClientRect();
+        if (x < rect.left + rect.width / 2) {
+          row.insertBefore(dragEl, siblings[i]);
+          return;
+        }
+      }
+      row.appendChild(dragEl);
+    }, { passive: false });
+
+    btn.addEventListener("touchend", function (e) {
+      if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+      if (dragging && dragEl === btn) {
+        e.preventDefault();
+        btn.classList.remove("dragging");
+        saveOrder();
+        justDragged = true;
+        setTimeout(function () { justDragged = false; }, 300);
+      }
+      dragging = false;
+      dragEl = null;
+    });
+
+    btn.addEventListener("touchcancel", function () {
+      if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+      dragging = false;
+      dragEl = null;
+      btn.classList.remove("dragging");
+    });
+  });
+
+  row.addEventListener("click", function (e) {
+    if (justDragged) { e.stopPropagation(); e.preventDefault(); }
+  }, true);
+})();
+
+/* ============ MISC ============ */
+window.addEventListener("resize", function () { if (map) map.invalidateSize(); });
+</script>
+</body>
+</html>
